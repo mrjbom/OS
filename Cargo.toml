@@ -1,0 +1,3 @@
+[workspace]
+members = ["kernel", "bootable-iso-builder"]
+resolver = "2"

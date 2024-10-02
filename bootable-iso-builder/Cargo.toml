@@ -1,0 +1,8 @@
+[package]
+name = "bootable-iso-builder"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bootloader = "0.11.7"
+bootloader-boot-config = "0.11.7"
