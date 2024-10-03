@@ -12,4 +12,4 @@ build:
 	cargo run --package bootable-iso-builder -- {{KERNEL_DEBUG_FILE_PATH}} {{BOOTABLE_ISO_FILE_PATH}}
 
 run: build
-	qemu-system-x86_64 {{BOOTABLE_ISO_FILE_PATH}}
+	qemu-system-x86_64 {{BOOTABLE_ISO_FILE_PATH}} -serial file:serial.log
