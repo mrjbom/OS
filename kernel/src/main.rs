@@ -6,7 +6,8 @@ mod serial_printer;
 static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
     let mut config = bootloader_api::BootloaderConfig::new_default();
     config.kernel_stack_size = 128 * 1024; // 128 KB
-    // Configure mapping created by bootloader
+
+    // Configure mappings created by bootloader
     let mut mappings = bootloader_api::config::Mappings::new_default();
     // Higher half
     mappings.dynamic_range_start = Some(0xFFFF_8000_0000_0000);
