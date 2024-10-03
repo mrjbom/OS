@@ -7,7 +7,7 @@ mod serial_printer;
 bootloader_api::entry_point!(kmain);
 
 #[no_mangle]
-fn kmain(_boot_info: &'static mut bootloader_api::BootInfo)  -> ! {
+fn kmain(_boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     serial_println!("Kernel started");
     loop {}
 }

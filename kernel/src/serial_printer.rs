@@ -1,5 +1,5 @@
-use x86_64::instructions::port::PortWriteOnly;
 use spin::Mutex;
+use x86_64::instructions::port::PortWriteOnly;
 
 const COM1_PORT: u16 = 0x3F8;
 
@@ -18,7 +18,9 @@ impl core::fmt::Write for SerialPrinter {
         let mut com1_port = PortWriteOnly::new(COM1_PORT);
         for ch in s.bytes() {
             if !ch.is_ascii_control() || ch == b'\n' {
-                unsafe { com1_port.write(ch); }
+                unsafe {
+                    com1_port.write(ch);
+                }
             }
         }
         Ok(())
