@@ -1,7 +1,8 @@
 #![no_std]
 #![no_main]
 
-mod serial_printer;
+mod com_ports;
+mod serial_debug_printer;
 
 static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
     let mut config = bootloader_api::BootloaderConfig::new_default();
@@ -20,13 +21,15 @@ static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
 bootloader_api::entry_point!(kmain, config = &BOOTLOADER_CONFIG);
 
 fn kmain(_boot_info: &'static mut bootloader_api::BootInfo) -> ! {
+    serial_debug_println!("Kernel loaded");
+    serial_debug_println!("Kernel finish");
     loop {}
 }
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     x86_64::instructions::interrupts::disable();
-    serial_println!("PANIC!!!");
-    serial_println!("{info}");
+    serial_debug_print!("PANIC!!!");
+    serial_debug_println!("{info}");
     loop {}
 }
