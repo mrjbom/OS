@@ -35,10 +35,9 @@ General Virtual Memory Layout (x86_64)
  ------------------------------------------------------------------------
  |                       0xFFFF_9000_0000_0000                          |
  |                                                                      |
- |                  Complete Physical Memory Mapping                    |
+ |                  Bootloader dynamic range start                      |
  |                                                                      |
- |       The entire physical memory is mapped here continuously         |
- | Access to physical memory can be obtained simply by adding an offset |
+ |   Bootloader use this offset to place kernel code, stack and other   |
  |                                                                      |
  |                              16 TB                                   |
  |                                                                      |
@@ -46,16 +45,27 @@ General Virtual Memory Layout (x86_64)
  ------------------------------------------------------------------------
  |                       0xFFFF_A000_0000_0000                          |
  |                                                                      |
- |                     Virtual Memory Allocations                       |
- |           For allocating large chunks of virtual memory              |
- |      composed of several different chunks of physical memory         |
+ |                  Complete Physical Memory Mapping                    |
+ |                                                                      |
+ |       The entire physical memory is mapped here continuously         |
+ | Access to physical memory can be obtained simply by adding an offset |
  |                                                                      |
  |                              16 TB                                   |
  |                                                                      |
  |                       0xFFFF_AFFF_FFFF_FFFF                          |
  ------------------------------------------------------------------------
  |                       0xFFFF_B000_0000_0000                          |
+ |                                                                      |
+ |                     Virtual Memory Allocations                       |
+ |           For allocating large chunks of virtual memory              |
+ |      composed of several different chunks of physical memory         |
+ |                                                                      |
+ |                              16 TB                                   |
+ |                                                                      |
+ |                       0xFFFF_BFFF_FFFF_FFFF                          |
+ ------------------------------------------------------------------------
+ |                       0xFFFF_C000_0000_0000                          |
  |                               NONE                                   |
- |                              80 TB                                   |
+ |                              66 TB                                   |
  |                       0xFFFF_FFFF_FFFF_FFFF                          |
  ------------------------------------------------------------------------
