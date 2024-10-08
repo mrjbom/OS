@@ -1,0 +1,61 @@
+General Virtual Memory Layout (x86_64)
+ -----------------------------------
+ |      0x0000_0000_0000_0000      |
+ |                                 |
+ |            Userspace            |
+ |                                 |
+ |              128 TB             |
+ |                                 |
+ |      0x0000_7FFF FFFF FFFF      |
+ -----------------------------------
+ |      0x0000_8000_0000_0000      |
+ |                                 |
+ |           Non-Canonical         |
+ |             Not used            |
+ |                                 |
+ |              18 EB              |
+ |                                 |
+ |      0xFFFF_7FFF_FFFF_FFFF      |
+ -----------------------------------
+ |      0xFFFF_8000_0000_0000      |
+ |                                 |
+ |           Kernel space          |
+ |                                 |
+ |              128 TB             |
+ |                                 |
+ |      0xFFFF_FFFF_FFFF_FFFF      |
+ -----------------------------------
+
+                          Kernel Space Layout
+ ------------------------------------------------------------------------
+ |                       0xFFFF_8000_0000_0000                          |
+ |                               NONE                                   |
+ |                              16 TB                                   |
+ |                       0xFFFF_8FFF_FFFF_FFFF                          |
+ ------------------------------------------------------------------------
+ |                       0xFFFF_9000_0000_0000                          |
+ |                                                                      |
+ |                  Complete Physical Memory Mapping                    |
+ |                                                                      |
+ |       The entire physical memory is mapped here continuously         |
+ | Access to physical memory can be obtained simply by adding an offset |
+ |                                                                      |
+ |                              16 TB                                   |
+ |                                                                      |
+ |                       0xFFFF_9FFF_FFFF_FFFF                          |
+ ------------------------------------------------------------------------
+ |                       0xFFFF_A000_0000_0000                          |
+ |                                                                      |
+ |                     Virtual Memory Allocations                       |
+ |           For allocating large chunks of virtual memory              |
+ |      composed of several different chunks of physical memory         |
+ |                                                                      |
+ |                              16 TB                                   |
+ |                                                                      |
+ |                       0xFFFF_AFFF_FFFF_FFFF                          |
+ ------------------------------------------------------------------------
+ |                       0xFFFF_B000_0000_0000                          |
+ |                               NONE                                   |
+ |                              80 TB                                   |
+ |                       0xFFFF_FFFF_FFFF_FFFF                          |
+ ------------------------------------------------------------------------
