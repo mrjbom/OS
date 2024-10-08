@@ -10,6 +10,7 @@ RUN_DEV_QEMU_FLAGS := "-serial mon:stdio -display none"
 list:
 	@just --list
 
+# Build debug version
 build-dev:
 	@echo "Building..."
 	@echo "Building kernel"
@@ -17,5 +18,12 @@ build-dev:
 	@echo "Creating bootable iso"
 	cargo run --package bootable-iso-builder -- {{KERNEL_DEBUG_FILE_PATH}} {{BOOTABLE_ISO_FILE_PATH}}
 
+# Build and run debug version
 run-dev: build-dev
 	qemu-system-x86_64 {{BOOTABLE_ISO_FILE_PATH}} {{RUN_DEV_QEMU_FLAGS}}
+
+# Alias for build-dev
+b: build-dev
+
+# Alias for run-dev
+r: run-dev
