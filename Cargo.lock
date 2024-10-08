@@ -561,6 +561,7 @@ version = "0.1.0"
 dependencies = [
  "bootloader_api",
  "lazy_static",
+ "log",
  "spin",
  "uart_16550",
  "volatile 0.6.1",

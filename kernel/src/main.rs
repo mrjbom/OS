@@ -2,7 +2,7 @@
 #![no_main]
 
 mod com_ports;
-mod serial_debug_printer;
+mod serial_debug;
 
 static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
     let mut config = bootloader_api::BootloaderConfig::new_default();
@@ -21,8 +21,9 @@ static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
 bootloader_api::entry_point!(kmain, config = &BOOTLOADER_CONFIG);
 
 fn kmain(_boot_info: &'static mut bootloader_api::BootInfo) -> ! {
-    serial_debug_println!("Kernel loaded");
-    serial_debug_println!("Kernel finish");
+    serial_debug::serial_logger::init();
+    log::info!("KERNEL START");
+    log::info!("KERNEL FINISH");
     loop {}
 }
 
