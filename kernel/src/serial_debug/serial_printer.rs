@@ -1,5 +1,5 @@
-use spin::Mutex;
 use crate::com_ports;
+use spin::Mutex;
 
 /// Serial port printer for QEMU logs writing
 ///

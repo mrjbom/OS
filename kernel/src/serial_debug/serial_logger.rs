@@ -1,4 +1,4 @@
-use log::{Record, Level, Metadata, LevelFilter};
+use log::{Level, LevelFilter, Metadata, Record};
 
 #[allow(dead_code)]
 static SERIAL_LOGGER: SerialLogger = SerialLogger;
@@ -22,5 +22,6 @@ impl log::Log for SerialLogger {
 /// Inits logger
 pub fn init() {
     log::set_logger(&SERIAL_LOGGER)
-        .map(|()| log::set_max_level(LevelFilter::Info)).expect("Failed to init logger");
+        .map(|()| log::set_max_level(LevelFilter::Info))
+        .expect("Failed to init logger");
 }
