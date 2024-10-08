@@ -12,7 +12,7 @@ impl log::Log for SerialLogger {
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            crate::serial_debug_println!("{}: {}", record.level(), record.args());
+            crate::serial_println!("{}: {}", record.level(), record.args());
         }
     }
 

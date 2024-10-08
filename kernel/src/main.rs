@@ -30,7 +30,7 @@ fn kmain(_boot_info: &'static mut bootloader_api::BootInfo) -> ! {
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     x86_64::instructions::interrupts::disable();
-    serial_debug_print!("PANIC!!!");
-    serial_debug_println!("{info}");
+    serial_println!("PANIC!!!");
+    serial_println!("{info}");
     loop {}
 }
