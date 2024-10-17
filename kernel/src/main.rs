@@ -5,6 +5,7 @@ use bootloader_api::config::Mapping;
 
 mod com_ports;
 mod serial_debug;
+mod gdt;
 
 static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
     let mut config = bootloader_api::BootloaderConfig::new_default();
@@ -28,6 +29,11 @@ bootloader_api::entry_point!(kmain, config = &BOOTLOADER_CONFIG);
 fn kmain(_boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     serial_debug::serial_logger::init();
     log::info!("KERNEL START");
+
+    // Init GDT
+    serial_println!("Init GDT");
+    gdt::init();
+
     log::info!("KERNEL FINISH");
     loop {}
 }
