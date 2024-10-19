@@ -4,7 +4,7 @@ use spin::Mutex;
 
 /// COM1 port for printing QEMU logs
 ///
-/// **Don't use in interrupts**  
+/// **Don't use in interrupts**<br>
 /// Use [COM1_PORT_LOCK_FREE] instead
 pub static COM1_PORT: Mutex<uart_16550::SerialPort> =
     unsafe { Mutex::new(uart_16550::SerialPort::new(0x3F8)) };

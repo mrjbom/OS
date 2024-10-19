@@ -18,7 +18,7 @@ pub static mut SERIAL_PRINTER_LOCK_FREE: SerialPrinterLockFree = SerialPrinterLo
 ///
 /// Locks COM1 PORT
 ///
-/// **Don't use in interrupts**
+/// **Don't use in interrupts**<br>
 /// If an interrupt occurs during a locked COM1 port and the interrupt handler tries to use this function, it will freeze.
 /// Use [SerialPrinterLockFree] in interrupts instead
 pub struct SerialPrinter;
@@ -72,8 +72,7 @@ macro_rules! serial_print {
 ///
 /// Locks COM1 PORT
 ///
-/// **Don't use in interrupts**
-///
+/// **Don't use in interrupts**<br>
 /// Use serial_println_lock_free instead
 /// ```ignore
 /// let mut com1_mutex_guard = com_ports::COM1_PORT.lock();
@@ -106,7 +105,6 @@ macro_rules! serial_print_lock_free {
 /// Prints ASCII string to COM1 without lock
 ///
 /// Can be used in interrupts
-///
 /// ```ignore
 /// let mut com1_mutex_guard = com_ports::COM1_PORT.lock();
 /// com1_mutex_guard.write_str("COM1 locked\n"); // Printed
