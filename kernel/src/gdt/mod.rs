@@ -1,9 +1,8 @@
-use x86_64::PrivilegeLevel;
-/// Inits GDT
-
-use x86_64::structures::gdt::{ GlobalDescriptorTable, Descriptor };
-use x86_64::registers::segmentation::SegmentSelector;
 use x86_64::instructions::segmentation::Segment;
+use x86_64::registers::segmentation::SegmentSelector;
+/// Inits GDT
+use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable};
+use x86_64::PrivilegeLevel;
 
 static mut GDT: GlobalDescriptorTable = GlobalDescriptorTable::new();
 
@@ -27,9 +26,21 @@ pub fn init() {
         // Set segment registers
         // CS, DS, SS, ES
         // FS and GS not used
-        x86_64::instructions::segmentation::CS::set_reg(SegmentSelector::new(1, PrivilegeLevel::Ring0));
-        x86_64::instructions::segmentation::DS::set_reg(SegmentSelector::new(2, PrivilegeLevel::Ring0));
-        x86_64::instructions::segmentation::SS::set_reg(SegmentSelector::new(2, PrivilegeLevel::Ring0));
-        x86_64::instructions::segmentation::ES::set_reg(SegmentSelector::new(2, PrivilegeLevel::Ring0));
+        x86_64::instructions::segmentation::CS::set_reg(SegmentSelector::new(
+            1,
+            PrivilegeLevel::Ring0,
+        ));
+        x86_64::instructions::segmentation::DS::set_reg(SegmentSelector::new(
+            2,
+            PrivilegeLevel::Ring0,
+        ));
+        x86_64::instructions::segmentation::SS::set_reg(SegmentSelector::new(
+            2,
+            PrivilegeLevel::Ring0,
+        ));
+        x86_64::instructions::segmentation::ES::set_reg(SegmentSelector::new(
+            2,
+            PrivilegeLevel::Ring0,
+        ));
     }
 }

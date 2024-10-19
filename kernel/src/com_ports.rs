@@ -2,10 +2,19 @@
 
 use spin::Mutex;
 
-lazy_static::lazy_static! {
-    pub static ref COM1_PORT: Mutex<uart_16550::SerialPort> = {
-        let com1_port = Mutex::new(unsafe { uart_16550::SerialPort::new(0x3F8) });
-        com1_port.lock().init();
-        com1_port
+/// COM1 port for printing QEMU logs
+///
+/// **Don't use in interrupts**
+pub static COM1_PORT: Mutex<uart_16550::SerialPort> =
+    unsafe { Mutex::new(uart_16550::SerialPort::new(0x3F8)) };
+
+/// Lock free COM1 port for printing QEMU logs in interrupts
+pub static mut COM1_PORT_LOCK_FREE: uart_16550::SerialPort =
+    unsafe { uart_16550::SerialPort::new(0x3F8) };
+
+pub fn init() {
+    #[allow(static_mut_refs)]
+    unsafe {
+        COM1_PORT_LOCK_FREE.init()
     };
 }

@@ -4,8 +4,8 @@
 use bootloader_api::config::Mapping;
 
 mod com_ports;
-mod serial_debug;
 mod gdt;
+mod serial_debug;
 
 static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
     let mut config = bootloader_api::BootloaderConfig::new_default();
@@ -28,6 +28,7 @@ bootloader_api::entry_point!(kmain, config = &BOOTLOADER_CONFIG);
 
 #[no_mangle]
 fn kmain(_boot_info: &'static mut bootloader_api::BootInfo) -> ! {
+    com_ports::init();
     serial_debug::serial_logger::init();
     log::info!("KERNEL START");
 
@@ -42,7 +43,7 @@ fn kmain(_boot_info: &'static mut bootloader_api::BootInfo) -> ! {
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     x86_64::instructions::interrupts::disable();
-    serial_println!("PANIC!!!");
-    serial_println!("{info}");
+    serial_println_lock_free!("PANIC!!!");
+    serial_println_lock_free!("{info}");
     loop {}
 }
