@@ -1,3 +1,7 @@
 [workspace]
 members = ["kernel", "bootable-iso-builder"]
 resolver = "2"
+
+[profile.dev]
+debug = "full"
+opt-level = 0

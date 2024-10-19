@@ -27,3 +27,7 @@ b: build-dev
 
 # Alias for run-dev
 r: run-dev
+
+# Runs qemu for gdb debug
+rdbg: build-dev
+	qemu-system-x86_64 {{BOOTABLE_ISO_FILE_PATH}} {{RUN_DEV_QEMU_FLAGS}} -s -S

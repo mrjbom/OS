@@ -26,6 +26,7 @@ static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
 
 bootloader_api::entry_point!(kmain, config = &BOOTLOADER_CONFIG);
 
+#[no_mangle]
 fn kmain(_boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     serial_debug::serial_logger::init();
     log::info!("KERNEL START");
