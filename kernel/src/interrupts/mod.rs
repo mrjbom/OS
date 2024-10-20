@@ -3,7 +3,7 @@ use x86_64::structures::idt::InterruptStackFrame;
 
 mod idt;
 
-// Master and slave Programmable Interrupt Controllers
+/// Master and slave Programmable Interrupt Controllers
 static mut PICS: pic8259::ChainedPics = unsafe { pic8259::ChainedPics::new(32, 32 + 8) };
 
 /// Inits and enable interrupts
