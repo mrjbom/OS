@@ -13,6 +13,7 @@ pub static COM1_PORT: Mutex<uart_16550::SerialPort> =
 pub static mut COM1_PORT_LOCK_FREE: uart_16550::SerialPort =
     unsafe { uart_16550::SerialPort::new(0x3F8) };
 
+/// Inits COM ports
 pub fn init() {
     #[allow(static_mut_refs)]
     unsafe {

@@ -562,6 +562,7 @@ dependencies = [
  "bootloader_api",
  "lazy_static",
  "log",
+ "pic8259",
  "spin",
  "uart_16550",
  "volatile 0.6.1",
@@ -650,6 +651,15 @@ name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f38d5652c16fde515bb1ecef450ab0f6a219d619a7274976324d5e377f7dceba"
+
+[[package]]
+name = "pic8259"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62d9a86c292b165f757e47e7fd66855def189b2564609bc4203727b27c33db22"
+dependencies = [
+ "x86_64",
+]
 
 [[package]]
 name = "pin-project"

@@ -1,3 +1,5 @@
+#![feature(abi_ptx)]
+#![feature(abi_x86_interrupt)]
 #![no_std]
 #![no_main]
 
@@ -5,6 +7,7 @@ use bootloader_api::config::Mapping;
 
 mod com_ports;
 mod gdt;
+mod interrupts;
 mod serial_debug;
 
 static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
@@ -33,11 +36,18 @@ fn kmain(_boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("KERNEL START");
 
     // Init GDT
-    serial_println!("Init GDT");
+    serial_println!("GDT initialization");
     gdt::init();
 
+    // Init and enable interrupts
+    serial_println!("Interrupts initialization and enabling");
+    interrupts::init();
+
+    x86_64::instructions::interrupts::disable();
     log::info!("KERNEL FINISH");
-    loop {}
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
 #[panic_handler]
