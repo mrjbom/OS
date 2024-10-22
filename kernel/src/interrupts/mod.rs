@@ -1,4 +1,3 @@
-use crate::serial_println_lock_free;
 use x86_64::structures::idt::InterruptStackFrame;
 
 mod idt;
@@ -27,9 +26,13 @@ pub fn general_handler_func(
     index: u8,
     _error_code: Option<u64>,
 ) {
-    serial_println_lock_free!("{index}");
-    #[allow(static_mut_refs)]
-    unsafe {
-        PICS.notify_end_of_interrupt(index)
-    };
+    if index < 32 {
+        // Exception
+    } else {
+        // Hardware PIC interrupt
+        #[allow(static_mut_refs)]
+        unsafe {
+            PICS.notify_end_of_interrupt(index)
+        };
+    }
 }
