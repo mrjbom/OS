@@ -7,6 +7,7 @@ use bootloader_api::config::Mapping;
 mod com_ports;
 mod gdt;
 mod interrupts;
+mod memory_management;
 mod serial_debug;
 
 static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
@@ -29,7 +30,7 @@ static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
 bootloader_api::entry_point!(kmain, config = &BOOTLOADER_CONFIG);
 
 #[no_mangle]
-fn kmain(_boot_info: &'static mut bootloader_api::BootInfo) -> ! {
+fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     com_ports::init();
     serial_debug::serial_logger::init();
     log::info!("KERNEL START");
@@ -41,6 +42,10 @@ fn kmain(_boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     // Init and enable interrupts
     serial_println!("Interrupts initialization and enabling");
     interrupts::init();
+
+    // Init memory manager
+    serial_println!("Memory manager initialization");
+    memory_management::init(boot_info);
 
     x86_64::instructions::interrupts::disable();
     log::info!("KERNEL FINISH");
