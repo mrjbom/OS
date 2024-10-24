@@ -258,7 +258,7 @@ checksum = "a35ba5100c2431e20b924c8103c2cf8adb919ed9880f625e8770c3cb9d1b06aa"
 [[package]]
 name = "buddy_alloc"
 version = "1.2.0"
-source = "git+https://github.com/mrjbom/buddy_alloc_rs.git#05b213b9c2207506b027c6b803920e2b92a44af8"
+source = "git+https://github.com/mrjbom/buddy_alloc_rs.git#93d73140fd80d24694461a9bd030a82d8a7dd3d4"
 dependencies = [
  "buddy_alloc_sys",
 ]
@@ -266,9 +266,10 @@ dependencies = [
 [[package]]
 name = "buddy_alloc_sys"
 version = "1.2.0"
-source = "git+https://github.com/mrjbom/buddy_alloc_rs.git#05b213b9c2207506b027c6b803920e2b92a44af8"
+source = "git+https://github.com/mrjbom/buddy_alloc_rs.git#93d73140fd80d24694461a9bd030a82d8a7dd3d4"
 dependencies = [
  "bindgen",
+ "cc",
 ]
 
 [[package]]
@@ -711,7 +712,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]

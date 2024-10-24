@@ -18,6 +18,14 @@ build-dev:
 	@echo "Creating bootable iso"
 	cargo run --package bootable-iso-builder -- {{KERNEL_DEBUG_FILE_PATH}} {{BOOTABLE_ISO_FILE_PATH}}
 
+# build-dev with verbose flags
+build-dev-verbose:
+	@echo "Building..."
+	@echo "Building kernel"
+	cargo build --package kernel --config kernel/config.toml --verbose
+	@echo "Creating bootable iso"
+	cargo run --package bootable-iso-builder -- {{KERNEL_DEBUG_FILE_PATH}} {{BOOTABLE_ISO_FILE_PATH}}
+
 # Build and run debug version
 run-dev: build-dev
 	qemu-system-x86_64 {{BOOTABLE_ISO_FILE_PATH}} {{RUN_DEV_QEMU_FLAGS}}
