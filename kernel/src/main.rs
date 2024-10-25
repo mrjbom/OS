@@ -59,5 +59,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     x86_64::instructions::interrupts::disable();
     serial_println_lock_free!("PANIC!!!");
     serial_println_lock_free!("{info}");
-    loop {}
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
