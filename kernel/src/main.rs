@@ -36,15 +36,15 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("KERNEL START");
 
     // Init GDT
-    serial_println!("GDT initialization");
+    log::info!("GDT initialization");
     gdt::init();
 
     // Init and enable interrupts
-    serial_println!("Interrupts initialization and enabling");
+    log::info!("Interrupts initialization and enabling");
     interrupts::init();
 
     // Init memory manager
-    serial_println!("Memory manager initialization");
+    log::info!("Memory manager initialization");
     memory_management::init(boot_info);
 
     x86_64::instructions::interrupts::disable();
