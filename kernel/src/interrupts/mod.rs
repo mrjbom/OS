@@ -1,4 +1,5 @@
 use x86_64::structures::idt::InterruptStackFrame;
+use crate::serial_print_lock_free;
 
 mod idt;
 
@@ -28,6 +29,7 @@ pub fn general_handler_func(
 ) {
     if index < 32 {
         // Exception
+        panic!("Exception {index} {_interrupt_stack_frame:#?}");
     } else {
         // Hardware PIC interrupt
         #[allow(static_mut_refs)]
