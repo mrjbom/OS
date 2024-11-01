@@ -222,22 +222,29 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
         #[cfg(debug_assertions)]
         {
             for v in USABLE_REGIONS.lock().iter() {
+                assert!(v.first_page >= ISA_DMA_MIN_FIRST_PAGE_ADDR);
                 assert!(v.first_page.is_aligned(PAGE_SIZE));
                 assert!(v.last_page.is_aligned(PAGE_SIZE));
                 assert!(v.first_page <= v.last_page);
             }
 
             for v in ISA_DMA_USABLE_REGIONS.lock().iter() {
+                assert!(v.first_page >= ISA_DMA_MIN_FIRST_PAGE_ADDR);
+                assert!(v.last_page <= ISA_DMA_MAX_LAST_PAGE_ADDR);
                 assert!(v.first_page.is_aligned(PAGE_SIZE));
                 assert!(v.last_page.is_aligned(PAGE_SIZE));
                 assert!(v.first_page <= v.last_page);
             }
             for v in DMA32_USABLE_REGIONS.lock().iter() {
+                assert!(v.first_page >= DMA32_MIN_FIRST_PAGE_ADDR);
+                assert!(v.last_page <= DMA32_MAX_LAST_PAGE_ADDR);
                 assert!(v.first_page.is_aligned(PAGE_SIZE));
                 assert!(v.last_page.is_aligned(PAGE_SIZE));
                 assert!(v.first_page <= v.last_page);
             }
             for v in HIGH_USABLE_REGIONS.lock().iter() {
+                assert!(v.first_page >= HIGH_MIN_FIRST_PAGE_ADDR);
+                assert!(v.last_page <= HIGH_MAX_LAST_PAGE_ADDR);
                 assert!(v.first_page.is_aligned(PAGE_SIZE));
                 assert!(v.last_page.is_aligned(PAGE_SIZE));
                 assert!(v.first_page <= v.last_page);
