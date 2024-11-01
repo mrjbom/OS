@@ -139,9 +139,9 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
                 if end <= start {
                     // Region fully in first MB, skip
                     log::debug!(
-                        "Usable region {{start: 0x{:X}, end: 0x{:X}}}, dropped. Fully in first MB",
-                        start,
-                        end
+                        "Usable region {{start: 0x{:X}, end: 0x{:X}}}, dropped. Fully in first MB.",
+                        usable_region.start,
+                        usable_region.end
                     );
                     continue;
                 }
@@ -150,9 +150,9 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
             if end - start < PAGE_SIZE * 4 {
                 log::debug!(
                     "Usable region {{start: 0x{:X}, end 0x{:X}}}, dropped. Too small ({}).",
-                    start,
-                    end,
-                    end - start
+                    usable_region.start,
+                    usable_region.end,
+                    usable_region.end - usable_region.start
                 );
                 continue;
             }
