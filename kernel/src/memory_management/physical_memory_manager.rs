@@ -15,12 +15,38 @@ use x86_64::PhysAddr;
 /// HIGH DMA ZONE (4 GB - 1 TB)
 struct MemoryZone {
     // Buddy allocator
-    allocator: BuddyAlloc,
+    pub allocator: BuddyAlloc,
     // Statistics
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum MemoryZoneEnum {
+    IsaDma,
+    Dma32,
+    High,
+}
+
+/// Specifies from which zones memory can be allocated and the priority in which it should be allocated
+///
+/// Example:
+/// [High, Dma32, IsaDma]:
+/// Attempts to allocate memory first from HIGH, then from DMA32 and then from ISA DMA
+///
+/// or
+///
+/// [Dma32, High]:
+/// Attempts to allocate memory first from Dma32, then from HIGH, but not trying to allocate memory from ISA DMA
+type MemoryZonesAndPrioritySpecifier = [MemoryZoneEnum];
+
 // ISA DMA
 
+/// ISA DMA zone: 1 MB - 16 GB
+///
+/// First usable page: 0x100000
+///
+/// Last priority for allocations
+///
+/// Last usable page: 0xFFF000
 static ISA_DMA_ZONE: Mutex<Option<MemoryZone>> = Mutex::new(None);
 
 /// Reserved metadata for ISA DMA allocator
@@ -29,17 +55,27 @@ static ISA_DMA_ZONE: Mutex<Option<MemoryZone>> = Mutex::new(None);
 static mut ISA_DMA_ALLOCATOR_METADATA: [u8; 1024 * 3] = [0; 1024 * 3];
 
 /// Address of the first page of the ISA DMA memory (first page of 2nd MB)
-const ISA_DMA_MIN_FIRST_PAGE_ADDR: PhysAddr = PhysAddr::new(0x100000);
+const ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR: PhysAddr = PhysAddr::new(0x100000);
 
 /// Address of the last page of the DMA memory (last page of 15th MB)
-const ISA_DMA_MAX_LAST_PAGE_ADDR: PhysAddr = PhysAddr::new(0xFFF000);
+const ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR: PhysAddr = PhysAddr::new(0xFFF000);
 
 /// ISA DMA memory size
-const ISA_DMA_MAX_SIZE: usize = (ISA_DMA_MAX_LAST_PAGE_ADDR.as_u64() + PAGE_SIZE
-    - ISA_DMA_MIN_FIRST_PAGE_ADDR.as_u64()) as usize;
+#[allow(unused)]
+const ISA_DMA_ZONE_MAX_SIZE: usize = (ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR.as_u64() + PAGE_SIZE
+    - ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64()) as usize;
 
 // DMA32
 
+/// DMA32 zone: 16 MB - 4 GB
+///
+/// PCI
+///
+/// Second priority for allocations
+///
+/// First usable page: 0x1000000
+///
+/// Last usable page: 0xFFFF_F000
 static DMA32_ZONE: Mutex<Option<MemoryZone>> = Mutex::new(None);
 
 /// Reserved metadata for DMA32 allocator
@@ -54,22 +90,31 @@ const DMA32_MIN_FIRST_PAGE_ADDR: PhysAddr = PhysAddr::new(0x1000000);
 const DMA32_MAX_LAST_PAGE_ADDR: PhysAddr = PhysAddr::new(0xFFFF_F000);
 
 /// DMA memory size
+#[allow(unused)]
 const DMA32_MAX_SIZE: usize =
     (DMA32_MAX_LAST_PAGE_ADDR.as_u64() + PAGE_SIZE - DMA32_MIN_FIRST_PAGE_ADDR.as_u64()) as usize;
 
 // HIGH
 
+/// HIGH zone: 4 GB - 1 TB
+///
+/// Max priority for allocations
+///
+/// First usable page: 0x1_0000_0000
+///
+/// Last usable page: 0xFF_FFFF_F000
 static HIGH_ZONE: Mutex<Option<MemoryZone>> = Mutex::new(None);
 
 /// Address of the first page of the HIGH memory (first page of 5th GB)
-const HIGH_MIN_FIRST_PAGE_ADDR: PhysAddr = PhysAddr::new(0x1_0000_0000);
+const HIGH_ZONE_MIN_FIRST_PAGE_ADDR: PhysAddr = PhysAddr::new(0x1_0000_0000);
 
 /// Address of the last page of the HIGH memory (last page of 1st TB)
-const HIGH_MAX_LAST_PAGE_ADDR: PhysAddr = PhysAddr::new(0xFF_FFFF_F000);
+const HIGH_ZONE_MAX_LAST_PAGE_ADDR: PhysAddr = PhysAddr::new(0xFF_FFFF_F000);
 
 /// HIGH memory size
-const HIGH_MAX_SIZE: usize =
-    (HIGH_MAX_LAST_PAGE_ADDR.as_u64() + PAGE_SIZE - HIGH_MIN_FIRST_PAGE_ADDR.as_u64()) as usize;
+#[allow(unused)]
+const HIGH_ZONE_MAX_SIZE: usize =
+    (HIGH_ZONE_MAX_LAST_PAGE_ADDR.as_u64() + PAGE_SIZE - HIGH_ZONE_MIN_FIRST_PAGE_ADDR.as_u64()) as usize;
 
 #[derive(Debug, Copy, Clone)]
 /// Can be used by memory allocators
@@ -121,7 +166,7 @@ lazy_static! {
     };
 }
 
-/// Inits Physical Memory Manager
+/// Inits Physical Memory Manager and allocators
 pub fn init(boot_info: &bootloader_api::BootInfo) {
     // Collect usable regions data
     log::info!("Collecting usable regions data");
@@ -134,8 +179,8 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
         {
             let mut start = usable_region.start;
             let end = usable_region.end;
-            if start < ISA_DMA_MIN_FIRST_PAGE_ADDR.as_u64() {
-                start = ISA_DMA_MIN_FIRST_PAGE_ADDR.as_u64();
+            if start < ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64() {
+                start = ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64();
                 if end <= start {
                     // Region fully in first MB, skip
                     log::debug!(
@@ -177,13 +222,13 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
         for usable_region in usable_regions_list.iter() {
             let new_usable_region = adjust_usable_region(
                 usable_region,
-                ISA_DMA_MIN_FIRST_PAGE_ADDR,
-                ISA_DMA_MAX_LAST_PAGE_ADDR,
+                ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR,
+                ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR,
             );
             if let Some(new_usable_region) = new_usable_region {
                 debug_assert!(new_usable_region.first_page <= new_usable_region.last_page);
-                debug_assert!(new_usable_region.first_page >= ISA_DMA_MIN_FIRST_PAGE_ADDR);
-                debug_assert!(new_usable_region.last_page <= ISA_DMA_MAX_LAST_PAGE_ADDR);
+                debug_assert!(new_usable_region.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
+                debug_assert!(new_usable_region.last_page <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR);
                 ISA_DMA_USABLE_REGIONS.lock().push(new_usable_region);
             }
         }
@@ -207,13 +252,13 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
         for usable_region in usable_regions_list.iter() {
             let new_usable_region = adjust_usable_region(
                 usable_region,
-                HIGH_MIN_FIRST_PAGE_ADDR,
-                HIGH_MAX_LAST_PAGE_ADDR,
+                HIGH_ZONE_MIN_FIRST_PAGE_ADDR,
+                HIGH_ZONE_MAX_LAST_PAGE_ADDR,
             );
             if let Some(new_usable_region) = new_usable_region {
                 debug_assert!(new_usable_region.first_page <= new_usable_region.last_page);
-                debug_assert!(new_usable_region.first_page >= HIGH_MIN_FIRST_PAGE_ADDR);
-                debug_assert!(new_usable_region.last_page <= HIGH_MAX_LAST_PAGE_ADDR);
+                debug_assert!(new_usable_region.first_page >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR);
+                debug_assert!(new_usable_region.last_page <= HIGH_ZONE_MAX_LAST_PAGE_ADDR);
                 HIGH_USABLE_REGIONS.lock().push(new_usable_region);
             }
         }
@@ -222,15 +267,15 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
         #[cfg(debug_assertions)]
         {
             for v in USABLE_REGIONS.lock().iter() {
-                assert!(v.first_page >= ISA_DMA_MIN_FIRST_PAGE_ADDR);
+                assert!(v.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
                 assert!(v.first_page.is_aligned(PAGE_SIZE));
                 assert!(v.last_page.is_aligned(PAGE_SIZE));
                 assert!(v.first_page <= v.last_page);
             }
 
             for v in ISA_DMA_USABLE_REGIONS.lock().iter() {
-                assert!(v.first_page >= ISA_DMA_MIN_FIRST_PAGE_ADDR);
-                assert!(v.last_page <= ISA_DMA_MAX_LAST_PAGE_ADDR);
+                assert!(v.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
+                assert!(v.last_page <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR);
                 assert!(v.first_page.is_aligned(PAGE_SIZE));
                 assert!(v.last_page.is_aligned(PAGE_SIZE));
                 assert!(v.first_page <= v.last_page);
@@ -243,8 +288,8 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
                 assert!(v.first_page <= v.last_page);
             }
             for v in HIGH_USABLE_REGIONS.lock().iter() {
-                assert!(v.first_page >= HIGH_MIN_FIRST_PAGE_ADDR);
-                assert!(v.last_page <= HIGH_MAX_LAST_PAGE_ADDR);
+                assert!(v.first_page >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR);
+                assert!(v.last_page <= HIGH_ZONE_MAX_LAST_PAGE_ADDR);
                 assert!(v.first_page.is_aligned(PAGE_SIZE));
                 assert!(v.last_page.is_aligned(PAGE_SIZE));
                 assert!(v.first_page <= v.last_page);
@@ -362,7 +407,6 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
     }
 
     // Init HIGH allocator
-    #[allow(static_mut_refs)]
     unsafe {
         let high_usable_regions = HIGH_USABLE_REGIONS.lock();
         if high_usable_regions.len() != 0 {
@@ -456,4 +500,37 @@ fn adjust_usable_region(
     }
 
     Some(new_usable_region)
+}
+
+/// Allocs memory from zone using buddy allocators
+///
+/// requested_size will be equated to the next power of two if it is not
+///
+/// MemoryZonesAndPrioritySpecifier specifies from which zones memory can be allocated and the priority in which it should be allocated
+///
+/// May be slow because may wait lock
+pub fn alloc(memory_zones_and_priority_specifier: &MemoryZonesAndPrioritySpecifier, requested_size: usize) -> *mut u8 {
+    for requested_memory_zone in memory_zones_and_priority_specifier.iter() {
+        // Lock zone
+        let requested_memory_zone_mutex_guard = match requested_memory_zone {
+            MemoryZoneEnum::IsaDma => {
+                ISA_DMA_ZONE.lock()
+            }
+            MemoryZoneEnum::Dma32 => {
+                DMA32_ZONE.lock()
+            }
+            MemoryZoneEnum::High => {
+                HIGH_ZONE.lock()
+            }
+        };
+        // Zone exist?
+        if let Some(requested_memory_zone) = requested_memory_zone_mutex_guard.as_ref() {
+            // Try to alloc memory from zone
+            let ptr = unsafe { requested_memory_zone.allocator.malloc(requested_size) };
+            if !ptr.is_null() {
+                return ptr;
+            }
+        }
+    }
+    core::ptr::null_mut()
 }
