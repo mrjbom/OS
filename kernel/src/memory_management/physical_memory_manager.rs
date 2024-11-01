@@ -136,7 +136,7 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
             let end = usable_region.end;
             if start < ISA_DMA_MIN_FIRST_PAGE_ADDR.as_u64() {
                 start = ISA_DMA_MIN_FIRST_PAGE_ADDR.as_u64();
-                if end < start + PAGE_SIZE {
+                if end <= start {
                     // Region fully in first MB, skip
                     log::debug!(
                         "Usable region {{start: 0x{:X}, end: 0x{:X}}}, dropped. Fully in first MB",
