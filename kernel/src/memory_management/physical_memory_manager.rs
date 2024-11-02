@@ -47,7 +47,7 @@ type MemoryZonesAndPrioritySpecifier = [MemoryZoneEnum];
 /// Last priority for allocations
 ///
 /// Last usable page: 0xFFF000
-static ISA_DMA_ZONE: Once<Option<Mutex<MemoryZone>>> = Once::new();
+static ISA_DMA_ZONE: Once<Mutex<MemoryZone>> = Once::new();
 
 /// Reserved metadata for ISA DMA allocator
 ///
@@ -76,7 +76,7 @@ const ISA_DMA_ZONE_MAX_SIZE: usize = (ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR.as_u64() +
 /// First usable page: 0x1000000
 ///
 /// Last usable page: 0xFFFF_F000
-static DMA32_ZONE: Once<Option<Mutex<MemoryZone>>> = Once::new();
+static DMA32_ZONE: Once<Mutex<MemoryZone>> = Once::new();
 
 /// Reserved metadata for DMA32 allocator
 ///
@@ -103,7 +103,7 @@ const DMA32_MAX_SIZE: usize =
 /// First usable page: 0x1_0000_0000
 ///
 /// Last usable page: 0xFF_FFFF_F000
-static HIGH_ZONE: Once<Option<Mutex<MemoryZone>>> = Once::new();
+static HIGH_ZONE: Once<Mutex<MemoryZone>> = Once::new();
 
 /// Address of the first page of the HIGH memory (first page of 5th GB)
 const HIGH_ZONE_MIN_FIRST_PAGE_ADDR: PhysAddr = PhysAddr::new(0x1_0000_0000);
@@ -322,7 +322,7 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
             assert!(metadata_size <= ISA_DMA_ALLOCATOR_METADATA.len());
 
             // 4
-            ISA_DMA_ZONE.call_once(|| {Some(Mutex::new(MemoryZone {
+            ISA_DMA_ZONE.call_once(|| {Mutex::new(MemoryZone {
                 allocator: BuddyAlloc::init_alignment(
                     ISA_DMA_ALLOCATOR_METADATA.as_mut_ptr(),
                     first_page.as_u64() as *mut u8,
@@ -330,14 +330,12 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
                     PAGE_SIZE as usize,
                 )
                     .expect("Failed to init ISA DMA buddy allocator!"),
-            }))});
+            })});
 
 
             // 5
             ISA_DMA_ZONE
                 .get()
-                .unwrap()
-                .as_ref()
                 .unwrap()
                 .lock()
                 .allocator
@@ -349,8 +347,6 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
                 let range_size = usable_region.last_page + PAGE_SIZE - usable_region.first_page;
                 ISA_DMA_ZONE
                     .get()
-                    .unwrap()
-                    .as_ref()
                     .unwrap()
                     .lock()
                     .allocator
@@ -378,7 +374,7 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
             assert!(metadata_size <= DMA32_ALLOCATOR_METADATA.len());
 
             // 4
-            DMA32_ZONE.call_once(|| {Some(Mutex::new(MemoryZone {
+            DMA32_ZONE.call_once(|| {Mutex::new(MemoryZone {
                 allocator: BuddyAlloc::init_alignment(
                     DMA32_ALLOCATOR_METADATA.as_mut_ptr(),
                     first_page.as_u64() as *mut u8,
@@ -386,13 +382,11 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
                     PAGE_SIZE as usize,
                 )
                     .expect("Failed to init DMA32 buddy allocator!"),
-            }))});
+            })});
 
             // 5
             DMA32_ZONE
                 .get()
-                .unwrap()
-                .as_ref()
                 .unwrap()
                 .lock()
                 .allocator
@@ -404,8 +398,6 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
                 let range_size = usable_region.last_page + PAGE_SIZE - usable_region.first_page;
                 DMA32_ZONE
                     .get()
-                    .unwrap()
-                    .as_ref()
                     .unwrap()
                     .lock()
                     .allocator
@@ -435,14 +427,14 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
             // Try to allocate memory using DMA32 and DMA allocator
             let high_allocator_metadata = 'metadata: {
                 // Try to allocate memory from DMA32
-                if let Some(dma32_zone) = DMA32_ZONE.get().unwrap().as_ref() {
+                if let Some(dma32_zone) = DMA32_ZONE.get() {
                     let ptr = dma32_zone.lock().allocator.malloc(metadata_size);
                     if !ptr.is_null() {
                         break 'metadata ptr;
                     }
                 }
                 // Allocation from DMA32 failed, try to allocate from DMA
-                if let Some(isa_dma_zone) = ISA_DMA_ZONE.get().unwrap().as_ref() {
+                if let Some(isa_dma_zone) = ISA_DMA_ZONE.get() {
                     let ptr = isa_dma_zone.lock().allocator.malloc(metadata_size);
                     if !ptr.is_null() {
                         break 'metadata ptr;
@@ -454,7 +446,7 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
             // If HIGH allocator initialization has started, it means that memory is more than 4 GB, and therefore we should definitely find memory in DMA32
             assert!(!high_allocator_metadata.is_null(), "Failed to allocate memory for HIGH allocator's metadata! It's impossible, looks like bug!");
             // 4
-            HIGH_ZONE.call_once(|| {Some(Mutex::new(MemoryZone {
+            HIGH_ZONE.call_once(|| {Mutex::new(MemoryZone {
                 allocator: BuddyAlloc::init_alignment(
                     high_allocator_metadata,
                     first_page.as_u64() as *mut u8,
@@ -462,13 +454,11 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
                     PAGE_SIZE as usize,
                 )
                     .expect("Failed to init HIGH buddy allocator!"),
-            }))});
+            })});
 
             // 5
             HIGH_ZONE
                 .get()
-                .unwrap()
-                .as_ref()
                 .unwrap()
                 .lock()
                 .allocator
@@ -481,8 +471,6 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
                 HIGH_ZONE
                     .get()
                     .unwrap()
-                    .as_ref()
-                    .unwrap()
                     .lock()
                     .allocator
                     .unsafe_release_range(first_page.as_u64() as *mut u8, range_size as usize);
@@ -492,11 +480,8 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
             log::info!("HIGH allocator not inited. No memory.")
         }
     }
-    ISA_DMA_ZONE.call_once(|| {None});
-    DMA32_ZONE.call_once(|| {None});
-    HIGH_ZONE.call_once(|| {None});
 
-    if ISA_DMA_ZONE.get().unwrap().is_none() && DMA32_ZONE.get().unwrap().is_none() && HIGH_ZONE.get().unwrap().is_none() {
+    if ISA_DMA_ZONE.get().is_none() && DMA32_ZONE.get().is_none() && HIGH_ZONE.get().is_none() {
         panic!("Physical memory allocator initialization failed! All buddy allocators not inited!");
     }
 }
@@ -544,7 +529,7 @@ pub fn alloc(memory_zones_and_priority_specifier: &MemoryZonesAndPrioritySpecifi
             }
         };
         // Zone exist?
-        if let Some(requested_memory_zone) = requested_memory_zone.get().unwrap().as_ref() {
+        if let Some(requested_memory_zone) = requested_memory_zone.get() {
             // Try to alloc memory from zone
             let ptr = unsafe { requested_memory_zone.lock().allocator.malloc(requested_size) };
             if !ptr.is_null() {
