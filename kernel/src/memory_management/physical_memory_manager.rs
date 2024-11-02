@@ -113,8 +113,8 @@ const HIGH_ZONE_MAX_LAST_PAGE_ADDR: PhysAddr = PhysAddr::new(0xFF_FFFF_F000);
 
 /// HIGH memory size
 #[allow(unused)]
-const HIGH_ZONE_MAX_SIZE: usize =
-    (HIGH_ZONE_MAX_LAST_PAGE_ADDR.as_u64() + PAGE_SIZE - HIGH_ZONE_MIN_FIRST_PAGE_ADDR.as_u64()) as usize;
+const HIGH_ZONE_MAX_SIZE: usize = (HIGH_ZONE_MAX_LAST_PAGE_ADDR.as_u64() + PAGE_SIZE
+    - HIGH_ZONE_MIN_FIRST_PAGE_ADDR.as_u64()) as usize;
 
 #[derive(Debug, Copy, Clone)]
 /// Can be used by memory allocators
@@ -322,16 +322,17 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
             assert!(metadata_size <= ISA_DMA_ALLOCATOR_METADATA.len());
 
             // 4
-            ISA_DMA_ZONE.call_once(|| {Mutex::new(MemoryZone {
-                allocator: BuddyAlloc::init_alignment(
-                    ISA_DMA_ALLOCATOR_METADATA.as_mut_ptr(),
-                    first_page.as_u64() as *mut u8,
-                    range_size,
-                    PAGE_SIZE as usize,
-                )
+            ISA_DMA_ZONE.call_once(|| {
+                Mutex::new(MemoryZone {
+                    allocator: BuddyAlloc::init_alignment(
+                        ISA_DMA_ALLOCATOR_METADATA.as_mut_ptr(),
+                        first_page.as_u64() as *mut u8,
+                        range_size,
+                        PAGE_SIZE as usize,
+                    )
                     .expect("Failed to init ISA DMA buddy allocator!"),
-            })});
-
+                })
+            });
 
             // 5
             ISA_DMA_ZONE
@@ -374,15 +375,17 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
             assert!(metadata_size <= DMA32_ALLOCATOR_METADATA.len());
 
             // 4
-            DMA32_ZONE.call_once(|| {Mutex::new(MemoryZone {
-                allocator: BuddyAlloc::init_alignment(
-                    DMA32_ALLOCATOR_METADATA.as_mut_ptr(),
-                    first_page.as_u64() as *mut u8,
-                    range_size,
-                    PAGE_SIZE as usize,
-                )
+            DMA32_ZONE.call_once(|| {
+                Mutex::new(MemoryZone {
+                    allocator: BuddyAlloc::init_alignment(
+                        DMA32_ALLOCATOR_METADATA.as_mut_ptr(),
+                        first_page.as_u64() as *mut u8,
+                        range_size,
+                        PAGE_SIZE as usize,
+                    )
                     .expect("Failed to init DMA32 buddy allocator!"),
-            })});
+                })
+            });
 
             // 5
             DMA32_ZONE
@@ -446,15 +449,17 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
             // If HIGH allocator initialization has started, it means that memory is more than 4 GB, and therefore we should definitely find memory in DMA32
             assert!(!high_allocator_metadata.is_null(), "Failed to allocate memory for HIGH allocator's metadata! It's impossible, looks like bug!");
             // 4
-            HIGH_ZONE.call_once(|| {Mutex::new(MemoryZone {
-                allocator: BuddyAlloc::init_alignment(
-                    high_allocator_metadata,
-                    first_page.as_u64() as *mut u8,
-                    range_size,
-                    PAGE_SIZE as usize,
-                )
+            HIGH_ZONE.call_once(|| {
+                Mutex::new(MemoryZone {
+                    allocator: BuddyAlloc::init_alignment(
+                        high_allocator_metadata,
+                        first_page.as_u64() as *mut u8,
+                        range_size,
+                        PAGE_SIZE as usize,
+                    )
                     .expect("Failed to init HIGH buddy allocator!"),
-            })});
+                })
+            });
 
             // 5
             HIGH_ZONE
@@ -514,24 +519,26 @@ fn adjust_usable_region(
 /// MemoryZonesAndPrioritySpecifier specifies from which zones memory can be allocated and the priority in which it should be allocated
 ///
 /// May be slow because may wait lock
-pub fn alloc(memory_zones_and_priority_specifier: &MemoryZonesAndPrioritySpecifier, requested_size: usize) -> *mut u8 {
+pub fn alloc(
+    memory_zones_and_priority_specifier: &MemoryZonesAndPrioritySpecifier,
+    requested_size: usize,
+) -> *mut u8 {
     for requested_memory_zone_specifier in memory_zones_and_priority_specifier.iter() {
         // Lock zone
         let requested_memory_zone = match requested_memory_zone_specifier {
-            MemoryZoneEnum::IsaDma => {
-                &ISA_DMA_ZONE
-            }
-            MemoryZoneEnum::Dma32 => {
-                &DMA32_ZONE
-            }
-            MemoryZoneEnum::High => {
-                &HIGH_ZONE
-            }
+            MemoryZoneEnum::IsaDma => &ISA_DMA_ZONE,
+            MemoryZoneEnum::Dma32 => &DMA32_ZONE,
+            MemoryZoneEnum::High => &HIGH_ZONE,
         };
         // Zone exist?
         if let Some(requested_memory_zone) = requested_memory_zone.get() {
             // Try to alloc memory from zone
-            let ptr = unsafe { requested_memory_zone.lock().allocator.malloc(requested_size) };
+            let ptr = unsafe {
+                requested_memory_zone
+                    .lock()
+                    .allocator
+                    .malloc(requested_size)
+            };
             if !ptr.is_null() {
                 return ptr;
             }
