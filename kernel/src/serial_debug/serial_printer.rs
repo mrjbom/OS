@@ -63,6 +63,7 @@ macro_rules! serial_print {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
         #[allow(static_mut_refs)]
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let result = unsafe { $crate::serial_debug::serial_printer::SERIAL_PRINTER.write_fmt(format_args!($($arg)*)) };
         result.expect("Failed to write to SERIAL_PRINTER")
     });
@@ -82,8 +83,8 @@ macro_rules! serial_print {
 /// ```
 #[macro_export]
 macro_rules! serial_println {
-    () => (crate::serial_print!("\n"));
-    ($($arg:tt)*) => (crate::serial_print!("{}\n", format_args!($($arg)*)));
+    () => ($crate::serial_print!("\n"));
+    ($($arg:tt)*) => ($crate::serial_print!("{}\n", format_args!($($arg)*)));
 }
 
 // Lock free variants
@@ -98,6 +99,7 @@ macro_rules! serial_print_lock_free {
         use core::fmt::Write;
         // Can't panic because used in panic handler
         #[allow(static_mut_refs)]
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let _ = unsafe { $crate::serial_debug::serial_printer::SERIAL_PRINTER_LOCK_FREE.write_fmt(format_args!($($arg)*)) };
     });
 }
@@ -113,6 +115,6 @@ macro_rules! serial_print_lock_free {
 /// ```
 #[macro_export]
 macro_rules! serial_println_lock_free {
-    () => (crate::serial_print_lock_free!("\n"));
-    ($($arg:tt)*) => (crate::serial_print_lock_free!("{}\n", format_args!($($arg)*)));
+    () => ($crate::serial_print_lock_free!("\n"));
+    ($($arg:tt)*) => ($crate::serial_print_lock_free!("{}\n", format_args!($($arg)*)));
 }
