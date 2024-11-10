@@ -521,7 +521,11 @@ fn adjust_usable_region(
 /// MemoryZonesAndPrioritySpecifier specifies from which zones memory can be allocated and the priority in which it should be allocated
 ///
 /// May be slow because may wait lock
-pub fn alloc(
+///
+/// # Safety
+/// May return null pointer<br>
+/// Allocated memory is uninitialized
+pub unsafe fn alloc(
     memory_zones_and_priority_specifier: &MemoryZonesAndPrioritySpecifier,
     requested_size: usize,
 ) -> *mut u8 {
@@ -558,7 +562,10 @@ pub fn alloc(
 /// Frees memory to buddy allocator
 ///
 /// May be slow because may wait lock
-pub fn free(freed_ptr: *mut u8, memory_zone_enum: MemoryZoneEnum) {
+/// 
+/// # Safety
+/// Freed memory must be previously allocated memory
+pub unsafe fn free(freed_ptr: *mut u8, memory_zone_enum: MemoryZoneEnum) {
     assert!(!freed_ptr.is_null(), "Trying to free null pointer");
     let memory_zone = match memory_zone_enum {
         MemoryZoneEnum::IsaDma => &ISA_DMA_ZONE,
