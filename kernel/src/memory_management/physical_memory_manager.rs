@@ -562,7 +562,7 @@ pub unsafe fn alloc(
 /// Frees memory to buddy allocator
 ///
 /// May be slow because may wait lock
-/// 
+///
 /// # Safety
 /// Freed memory must be previously allocated memory
 pub unsafe fn free(freed_ptr: *mut u8, memory_zone_enum: MemoryZoneEnum) {
