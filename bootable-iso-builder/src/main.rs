@@ -21,7 +21,7 @@ fn main() {
 
     let mut bootable_iso = bootloader::BiosBoot::new(kernel_file_path);
     bootable_iso.set_boot_config(&boot_config);
-    let result = bootable_iso.create_disk_image(bootable_iso_file_path.into());
+    let result = bootable_iso.create_disk_image(bootable_iso_file_path);
     if let Err(error) = result {
         panic!("Failed to create bootable iso: {error}");
     }

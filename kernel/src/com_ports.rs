@@ -17,6 +17,6 @@ pub static mut COM1_PORT_LOCK_FREE: uart_16550::SerialPort =
 pub fn init() {
     #[allow(static_mut_refs)]
     unsafe {
-        COM1_PORT_LOCK_FREE.init()
+        COM1_PORT_LOCK_FREE.init();
     };
 }

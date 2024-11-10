@@ -1,6 +1,7 @@
 use super::PAGE_SIZE;
 use bootloader_api::info::MemoryRegionKind;
 use buddy_alloc::BuddyAlloc;
+use core::ptr::null_mut;
 use lazy_static::lazy_static;
 use spin::{Mutex, Once};
 use tinyvec::ArrayVec;
@@ -13,6 +14,7 @@ use x86_64::PhysAddr;
 /// DMA32 ZONE (16 MB - 4 GB)
 ///
 /// HIGH DMA ZONE (4 GB - 1 TB)
+// TODO: Implement Debug trait
 struct MemoryZone {
     // Buddy allocator
     pub allocator: BuddyAlloc,
@@ -514,7 +516,7 @@ fn adjust_usable_region(
 
 /// Allocs memory from zone using buddy allocators
 ///
-/// requested_size will be equated to the next power of two if it is not
+/// requested_size must be power of two
 ///
 /// MemoryZonesAndPrioritySpecifier specifies from which zones memory can be allocated and the priority in which it should be allocated
 ///
@@ -523,6 +525,12 @@ pub fn alloc(
     memory_zones_and_priority_specifier: &MemoryZonesAndPrioritySpecifier,
     requested_size: usize,
 ) -> *mut u8 {
+    assert_ne!(requested_size, 0, "Trying to alloc zero sized block");
+    assert!(
+        requested_size.is_power_of_two(),
+        "requested_size is non power of two"
+    );
+
     for requested_memory_zone_specifier in memory_zones_and_priority_specifier.iter() {
         // Lock zone
         let requested_memory_zone = match requested_memory_zone_specifier {
@@ -533,16 +541,36 @@ pub fn alloc(
         // Zone exist?
         if let Some(requested_memory_zone) = requested_memory_zone.get() {
             // Try to alloc memory from zone
-            let ptr = unsafe {
+            let allocated_ptr = unsafe {
                 requested_memory_zone
                     .lock()
                     .allocator
                     .malloc(requested_size)
             };
-            if !ptr.is_null() {
-                return ptr;
+            if !allocated_ptr.is_null() {
+                return allocated_ptr;
             }
         }
     }
-    core::ptr::null_mut()
+    null_mut()
+}
+
+/// Frees memory to buddy allocator
+///
+/// May be slow because may wait lock
+pub fn free(freed_ptr: *mut u8, memory_zone_enum: MemoryZoneEnum) {
+    assert!(!freed_ptr.is_null(), "Trying to free null pointer");
+    let memory_zone = match memory_zone_enum {
+        MemoryZoneEnum::IsaDma => &ISA_DMA_ZONE,
+        MemoryZoneEnum::Dma32 => &DMA32_ZONE,
+        MemoryZoneEnum::High => &HIGH_ZONE,
+    };
+    unsafe {
+        memory_zone
+            .get()
+            .expect("Trying to free memory from non-existing zone")
+            .lock()
+            .allocator
+            .free(freed_ptr);
+    }
 }
