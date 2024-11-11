@@ -1,4 +1,5 @@
 mod physical_memory_manager;
+mod virtual_memory_manager;
 
 /// 4KB
 const PAGE_SIZE: u64 = 4096;

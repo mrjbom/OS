@@ -16,7 +16,7 @@ static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
 
     // Configure mappings created by bootloader
     let mut mappings = bootloader_api::config::Mappings::new_default();
-    // ../doc/virtual_memory_layout.txt
+    // doc/virtual_memory_layout.txt
     mappings.dynamic_range_start = Some(0xFFFF_9000_0000_0000);
     mappings.dynamic_range_end = Some(0xFFFF_9FFF_FFFF_F000);
     // Complete physical memory mapping with offset
