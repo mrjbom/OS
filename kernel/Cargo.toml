@@ -16,3 +16,4 @@ tinyvec = "1.8.0"
 
 # My buddy_alloc library wrapper
 buddy_alloc = { git = "https://github.com/mrjbom/buddy_alloc_rs.git" }
+slab_allocator = { git = "https://github.com/mrjbom/slab_allocator.git" }

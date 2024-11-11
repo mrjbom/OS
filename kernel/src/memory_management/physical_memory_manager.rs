@@ -1,8 +1,10 @@
-use super::PAGE_SIZE;
+use core::mem::MaybeUninit;
+use super::{virtual_memory_manager, PAGE_SIZE};
 use bootloader_api::info::{MemoryRegion, MemoryRegionKind};
 use buddy_alloc::BuddyAlloc;
 use core::ptr::{null_mut, NonNull};
 use lazy_static::lazy_static;
+use slab_allocator::SlabInfo;
 use spin::{Mutex, Once};
 use tinyvec::ArrayVec;
 use x86_64::PhysAddr;
@@ -10,7 +12,13 @@ use x86_64::PhysAddr;
 /// Array of saved SlabInfo's pointers for each page. Used by Slab Allocator's
 ///
 /// Mutex is not required because a properly working SlabAllocator and his MemoryBackend will not touch data that is not its own
-static mut SLAB_INFO_PTRS: Once<&'static mut [Option<NonNull<*mut u8>>]> = Once::new();
+// TODO: Instead of this approach, you can use a hash table.
+// But the hash table approach has the disadvantage that
+// it requires expanding the hash table (doubling its size), and it doesn't fit well with SlabAllocator (you'll have to create a many of caches of double size)
+// This array approach wastes memory. Thus, we have to store 262144 pointers(2097152 bytes, 2MB) for 1 GB of memory
+//
+// MaybeUninit is used because initializing the entire array memory before creating a slice is a heavy operation
+static mut SLAB_INFO_PTRS: Once<&'static mut [MaybeUninit<*mut SlabInfo>]> = Once::new();
 
 /// Some zone in memory:
 ///
@@ -67,8 +75,8 @@ const ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR: PhysAddr = PhysAddr::new(0xFFF000);
 
 /// ISA DMA memory size
 #[allow(unused)]
-const ISA_DMA_ZONE_MAX_SIZE: usize = (ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR.as_u64() + PAGE_SIZE
-    - ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64()) as usize;
+const ISA_DMA_ZONE_MAX_SIZE: usize = (ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR.as_u64() as usize + PAGE_SIZE
+    - ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64() as usize);
 
 // DMA32
 
@@ -97,7 +105,7 @@ const DMA32_MAX_LAST_PAGE_ADDR: PhysAddr = PhysAddr::new(0xFFFF_F000);
 /// DMA memory size
 #[allow(unused)]
 const DMA32_MAX_SIZE: usize =
-    (DMA32_MAX_LAST_PAGE_ADDR.as_u64() + PAGE_SIZE - DMA32_MIN_FIRST_PAGE_ADDR.as_u64()) as usize;
+    (DMA32_MAX_LAST_PAGE_ADDR.as_u64() as usize + PAGE_SIZE - DMA32_MIN_FIRST_PAGE_ADDR.as_u64() as usize);
 
 // HIGH
 
@@ -118,8 +126,8 @@ const HIGH_ZONE_MAX_LAST_PAGE_ADDR: PhysAddr = PhysAddr::new(0xFF_FFFF_F000);
 
 /// HIGH memory size
 #[allow(unused)]
-const HIGH_ZONE_MAX_SIZE: usize = (HIGH_ZONE_MAX_LAST_PAGE_ADDR.as_u64() + PAGE_SIZE
-    - HIGH_ZONE_MIN_FIRST_PAGE_ADDR.as_u64()) as usize;
+const HIGH_ZONE_MAX_SIZE: usize = (HIGH_ZONE_MAX_LAST_PAGE_ADDR.as_u64() as usize + PAGE_SIZE
+    - HIGH_ZONE_MIN_FIRST_PAGE_ADDR.as_u64() as usize);
 
 #[derive(Debug, Copy, Clone)]
 /// Can be used by memory allocators
@@ -132,6 +140,13 @@ struct UsableRegion {
     ///
     /// Page-alligned
     last_page: PhysAddr,
+}
+
+impl UsableRegion {
+    /// Gets size of usable region
+    pub fn size(&self) -> usize {
+        self.last_page.as_u64() as usize + PAGE_SIZE - self.first_page.as_u64() as usize
+    }
 }
 
 impl Default for UsableRegion {
@@ -171,6 +186,15 @@ lazy_static! {
     };
 }
 
+/// Range size from the first to the last usable page
+///
+/// This is not the size of the physical memory
+static USABLE_MEMORY_RANGE_SIZE: Once<usize> = Once::new();
+/// Number of pages in the range from the first to the last usable page
+///
+/// This is not the number of the usable physical pages
+static USABLE_MEMORY_PAGES_NUMBER: Once<usize> = Once::new();
+
 /// Inits Physical Memory Manager and allocators
 pub fn init(boot_info: &bootloader_api::BootInfo) {
     // Collect usable regions data
@@ -194,14 +218,14 @@ fn collect_usable_regions(memory_regions: &[MemoryRegion]) {
             }
         }
         // Aligning addresses of too small a region can lead to problems, it is easier to discard it.
-        if end - start < PAGE_SIZE * 4 {
+        if end - start < PAGE_SIZE as u64 * 4 {
             continue;
         }
         // First usable page
-        let first_page = PhysAddr::new(start).align_up(PAGE_SIZE);
+        let first_page = PhysAddr::new(start).align_up(PAGE_SIZE as u64);
         // Last usable page
         // end - PAGE_SIZE needed because end is exclusive
-        let last_page = PhysAddr::new(end - PAGE_SIZE).align_down(PAGE_SIZE);
+        let last_page = PhysAddr::new(end - PAGE_SIZE as u64).align_down(PAGE_SIZE as u64);
         assert!(last_page > first_page);
         assert!(last_page - first_page >= 4096);
         usable_regions_lock.push(UsableRegion {
@@ -213,6 +237,13 @@ fn collect_usable_regions(memory_regions: &[MemoryRegion]) {
     usable_regions_lock
         .as_mut_slice()
         .sort_unstable_by_key(|a| a.first_page);
+
+    USABLE_MEMORY_RANGE_SIZE.call_once(|| {
+        (usable_regions_lock.last().unwrap().last_page + PAGE_SIZE as u64 - usable_regions_lock.first().unwrap().first_page) as usize
+    });
+    USABLE_MEMORY_PAGES_NUMBER.call_once(|| {
+        USABLE_MEMORY_RANGE_SIZE.get().unwrap() / PAGE_SIZE as usize
+    });
 
     // Collect usable ISA DMA regions
     for usable_region in usable_regions_lock.iter() {
@@ -264,30 +295,30 @@ fn collect_usable_regions(memory_regions: &[MemoryRegion]) {
         drop(usable_regions_lock);
         for v in USABLE_REGIONS.lock().iter() {
             assert!(v.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
-            assert!(v.first_page.is_aligned(PAGE_SIZE));
-            assert!(v.last_page.is_aligned(PAGE_SIZE));
+            assert!(v.first_page.is_aligned(PAGE_SIZE as u64));
+            assert!(v.last_page.is_aligned(PAGE_SIZE as u64));
             assert!(v.first_page <= v.last_page);
         }
 
         for v in ISA_DMA_USABLE_REGIONS.lock().iter() {
             assert!(v.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
             assert!(v.last_page <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR);
-            assert!(v.first_page.is_aligned(PAGE_SIZE));
-            assert!(v.last_page.is_aligned(PAGE_SIZE));
+            assert!(v.first_page.is_aligned(PAGE_SIZE as u64));
+            assert!(v.last_page.is_aligned(PAGE_SIZE as u64));
             assert!(v.first_page <= v.last_page);
         }
         for v in DMA32_USABLE_REGIONS.lock().iter() {
             assert!(v.first_page >= DMA32_MIN_FIRST_PAGE_ADDR);
             assert!(v.last_page <= DMA32_MAX_LAST_PAGE_ADDR);
-            assert!(v.first_page.is_aligned(PAGE_SIZE));
-            assert!(v.last_page.is_aligned(PAGE_SIZE));
+            assert!(v.first_page.is_aligned(PAGE_SIZE as u64));
+            assert!(v.last_page.is_aligned(PAGE_SIZE as u64));
             assert!(v.first_page <= v.last_page);
         }
         for v in HIGH_USABLE_REGIONS.lock().iter() {
             assert!(v.first_page >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR);
             assert!(v.last_page <= HIGH_ZONE_MAX_LAST_PAGE_ADDR);
-            assert!(v.first_page.is_aligned(PAGE_SIZE));
-            assert!(v.last_page.is_aligned(PAGE_SIZE));
+            assert!(v.first_page.is_aligned(PAGE_SIZE as u64));
+            assert!(v.last_page.is_aligned(PAGE_SIZE as u64));
             assert!(v.first_page <= v.last_page);
         }
     }
@@ -316,7 +347,42 @@ fn adjust_usable_region(
 
 /// Inits array of SlabInfo pointers
 fn init_slab_info_ptrs_array() {
+    assert!(USABLE_REGIONS.lock().is_sorted_by_key(|v| { v.first_page }));
+    // Calculate required memory size for store SlabInfo's
+    // SlabInfo per page
+    let number_of_slab_infos = *USABLE_MEMORY_PAGES_NUMBER.get().unwrap();
+    let mut required_memory_size = number_of_slab_infos * size_of::<Option<NonNull<SlabInfo>>>();
+    if required_memory_size % PAGE_SIZE != 0 {
+        required_memory_size += PAGE_SIZE - (required_memory_size % PAGE_SIZE)
+    }
+    assert_eq!(required_memory_size % PAGE_SIZE, 0);
 
+    // Reserve required memory in usable region
+    // Physical address of the array
+    let mut required_memory_phys_addr: PhysAddr = PhysAddr::zero();
+    for usable_region in USABLE_REGIONS.lock().iter_mut().rev() {
+        if usable_region.size() > required_memory_size {
+            // Use this region
+            required_memory_phys_addr = PhysAddr::new(usable_region.first_page.as_u64());
+            usable_region.first_page += required_memory_size as u64;
+            assert!(usable_region.first_page.is_aligned(PAGE_SIZE as u64));
+            assert!(usable_region.size() >= PAGE_SIZE);
+            break;
+        }
+    }
+    assert!(!required_memory_phys_addr.is_null(), "Failed to find memory for SlabInfo pointers array");
+    assert!(required_memory_phys_addr.is_aligned(align_of::<SlabInfo>() as u64));
+    assert!(USABLE_REGIONS.lock().is_sorted_by_key(|v| { v.first_page }), "Usable regions sort broken, looks like bug (probably the memory map is not quite right)");
+
+    // Memory reserved, make slice
+    // Convert to virtual address
+    let required_memory_virt_addr = virtual_memory_manager::phys_addr_to_cpmm_virt_addr(required_memory_phys_addr);
+    // We don't init memory, because it's may be slow operation, there is no UB, because MaybeUninit used.
+    // For example, a machine with 32 gigabytes of memory will need to initialize 64 megabytes.
+    let slice: &'static mut [MaybeUninit<*mut SlabInfo>] = unsafe {
+        core::slice::from_raw_parts_mut(required_memory_virt_addr.as_mut_ptr(), number_of_slab_infos)
+    };
+    assert_eq!(slice.len() * size_of_val(&slice.first()), number_of_slab_infos * size_of::<*mut u8>());
 }
 
 /// Inits zone allocators
@@ -338,7 +404,7 @@ fn init_allocators() {
             // 1
             let first_page = isa_dma_usable_regions_lock.first().unwrap().first_page;
             let last_page = isa_dma_usable_regions_lock.last().unwrap().last_page;
-            let range_size = (last_page + PAGE_SIZE - first_page) as usize;
+            let range_size = (last_page + PAGE_SIZE as u64 - first_page) as usize;
 
             // 2
             let metadata_size = BuddyAlloc::sizeof_alignment(range_size, PAGE_SIZE as usize)
@@ -368,14 +434,12 @@ fn init_allocators() {
 
             // 6
             for usable_region in isa_dma_usable_regions_lock.iter() {
-                let first_page = usable_region.first_page;
-                let range_size = usable_region.last_page + PAGE_SIZE - usable_region.first_page;
                 ISA_DMA_ZONE
                     .get()
                     .unwrap()
                     .lock()
                     .allocator
-                    .unsafe_release_range(first_page.as_u64() as *mut u8, range_size as usize);
+                    .unsafe_release_range(usable_region.first_page.as_u64() as *mut u8, usable_region.size());
             }
             log::info!("ISA DMA allocator inited");
         } else {
@@ -391,7 +455,7 @@ fn init_allocators() {
             // 1
             let first_page = dma32_usable_regions_lock.first().unwrap().first_page;
             let last_page = dma32_usable_regions_lock.last().unwrap().last_page;
-            let range_size = (last_page + PAGE_SIZE - first_page) as usize;
+            let range_size = (last_page + PAGE_SIZE as u64 - first_page) as usize;
 
             // 2
             let metadata_size = BuddyAlloc::sizeof_alignment(range_size, PAGE_SIZE as usize)
@@ -421,14 +485,12 @@ fn init_allocators() {
 
             // 6
             for usable_region in dma32_usable_regions_lock.iter() {
-                let first_page = usable_region.first_page;
-                let range_size = usable_region.last_page + PAGE_SIZE - usable_region.first_page;
                 DMA32_ZONE
                     .get()
                     .unwrap()
                     .lock()
                     .allocator
-                    .unsafe_release_range(first_page.as_u64() as *mut u8, range_size as usize);
+                    .unsafe_release_range(usable_region.first_page.as_u64() as *mut u8, usable_region.size());
             }
             log::info!("DMA32 allocator inited");
         } else {
@@ -443,7 +505,7 @@ fn init_allocators() {
             // 1
             let first_page = high_usable_regions_lock.first().unwrap().first_page;
             let last_page = high_usable_regions_lock.last().unwrap().last_page;
-            let range_size = (last_page + PAGE_SIZE - first_page) as usize;
+            let range_size = (last_page + PAGE_SIZE as u64 - first_page) as usize;
 
             // 2
             let metadata_size = BuddyAlloc::sizeof_alignment(range_size, PAGE_SIZE as usize)
@@ -495,14 +557,12 @@ fn init_allocators() {
 
             // 6
             for usable_region in high_usable_regions_lock.iter() {
-                let first_page = usable_region.first_page;
-                let range_size = usable_region.last_page + PAGE_SIZE - usable_region.first_page;
                 HIGH_ZONE
                     .get()
                     .unwrap()
                     .lock()
                     .allocator
-                    .unsafe_release_range(first_page.as_u64() as *mut u8, range_size as usize);
+                    .unsafe_release_range(usable_region.first_page.as_u64() as *mut u8, usable_region.size());
             }
             log::info!("HIGH allocator inited");
         } else {
