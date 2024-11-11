@@ -1,5 +1,10 @@
 use x86_64::{PhysAddr, VirtAddr};
 
+// TODO: Idea: Add different wrapper types for virtual addresses belonging to different areas,
+// this is due to the fact that their conversion to physical addresses may differ.
+// A virtual address from a Complete Physical Memory Mapping area can be easily converted to a physical address,
+// but a virtual address from a user space or a virtual address from a Virtual Memory Allocations area should be treated differently.
+
 /// doc/virtual_memory_layout.txt
 /// Complete Physical Memory Mapping offset in virtual memory
 pub const PHYSICAL_MEMORY_MAPPING_OFFSET: u64 = 0xFFFF_A000_0000_0000;
