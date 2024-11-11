@@ -29,10 +29,10 @@ pub struct SerialPrinterLockFree;
 
 impl core::fmt::Write for SerialPrinter {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        let mut com1_port = com_ports::COM1_PORT.lock();
+        let mut com1_port_lock = com_ports::COM1_PORT.lock();
         for ch in s.bytes() {
             if !ch.is_ascii_control() || ch == b'\n' {
-                com1_port.send(ch);
+                com1_port_lock.send(ch);
             }
         }
         Ok(())
@@ -58,6 +58,7 @@ impl core::fmt::Write for SerialPrinterLockFree {
 /// Locks COM1 PORT
 ///
 /// **Don't use in interrupts**
+/// # May panic
 #[macro_export]
 macro_rules! serial_print {
     ($($arg:tt)*) => ({
@@ -76,11 +77,12 @@ macro_rules! serial_print {
 /// **Don't use in interrupts**<br>
 /// Use serial_println_lock_free instead
 /// ```ignore
-/// let mut com1_mutex_guard = com_ports::COM1_PORT.lock();
-/// com1_mutex_guard.write_str("COM1 locked\n"); // Printed
+/// let mut com1_lock = com_ports::COM1_PORT.lock();
+/// com1_lock.write_str("COM1 locked\n"); // Printed
 /// //serial_println!("DEADLOCK!!!"); // Not printed, deadlock, infinite loop
 /// serial_println_lock_free!("But serial_println_lock_free may print"); // Printed
 /// ```
+/// # May panic
 #[macro_export]
 macro_rules! serial_println {
     () => ($crate::serial_print!("\n"));
@@ -108,8 +110,8 @@ macro_rules! serial_print_lock_free {
 ///
 /// Can be used in interrupts
 /// ```ignore
-/// let mut com1_mutex_guard = com_ports::COM1_PORT.lock();
-/// com1_mutex_guard.write_str("COM1 locked\n"); // Printed
+/// let mut com1_lock = com_ports::COM1_PORT.lock();
+/// com1_lock.write_str("COM1 locked\n"); // Printed
 /// //serial_println!("DEADLOCK!!!"); // Not printed, deadlock, infinite loop
 /// serial_println_lock_free!("But serial_println_lock_free may print"); // Printed
 /// ```

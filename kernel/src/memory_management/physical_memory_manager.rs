@@ -1,11 +1,16 @@
 use super::PAGE_SIZE;
-use bootloader_api::info::MemoryRegionKind;
+use bootloader_api::info::{MemoryRegion, MemoryRegionKind};
 use buddy_alloc::BuddyAlloc;
-use core::ptr::null_mut;
+use core::ptr::{null_mut, NonNull};
 use lazy_static::lazy_static;
 use spin::{Mutex, Once};
 use tinyvec::ArrayVec;
 use x86_64::PhysAddr;
+
+/// Array of saved SlabInfo's pointers for each page. Used by Slab Allocator's
+///
+/// Mutex is not required because a properly working SlabAllocator and his MemoryBackend will not touch data that is not its own
+static mut SLAB_INFO_PTRS: Once<&'static mut [Option<NonNull<*mut u8>>]> = Once::new();
 
 /// Some zone in memory:
 ///
@@ -30,14 +35,12 @@ pub enum MemoryZoneEnum {
 
 /// Specifies from which zones memory can be allocated and the priority in which it should be allocated
 ///
-/// Example:
-/// [High, Dma32, IsaDma]:
-/// Attempts to allocate memory first from HIGH, then from DMA32 and then from ISA DMA
-///
-/// or
-///
+/// Example:<br>
+/// [High, Dma32, IsaDma]:<br>
+/// Attempts to allocate memory first from HIGH, then from DMA32 and then from ISA DMA<br>
+/// or<br>
 /// [Dma32, High]:
-/// Attempts to allocate memory first from Dma32, then from HIGH, but not trying to allocate memory from ISA DMA
+/// Attempts to allocate memory first from Dma32, then from HIGH, but not trying to allocate memory from ISA DMA<br>
 type MemoryZonesAndPrioritySpecifier = [MemoryZoneEnum];
 
 // ISA DMA
@@ -171,325 +174,122 @@ lazy_static! {
 /// Inits Physical Memory Manager and allocators
 pub fn init(boot_info: &bootloader_api::BootInfo) {
     // Collect usable regions data
-    log::info!("Collecting usable regions data");
+    collect_usable_regions(&*boot_info.memory_regions);
+    init_slab_info_ptrs_array();
+    init_allocators();
+}
+
+/// Parses memory map and collects data about usable regions
+fn collect_usable_regions(memory_regions: &[MemoryRegion]) {
+    let mut usable_regions_lock = USABLE_REGIONS.lock();
+    for usable_region in memory_regions.iter().filter(|usable_region| usable_region.kind == MemoryRegionKind::Usable)
     {
-        let mut usable_regions_list = USABLE_REGIONS.lock();
-        for usable_region in boot_info
-            .memory_regions
-            .iter()
-            .filter(|usable_region| usable_region.kind == MemoryRegionKind::Usable)
-        {
-            let mut start = usable_region.start;
-            let end = usable_region.end;
-            if start < ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64() {
-                start = ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64();
-                if end <= start {
-                    // Region fully in first MB, skip
-                    log::debug!(
-                        "Usable region {{start: 0x{:X}, end: 0x{:X}}}, dropped. Fully in first MB.",
-                        usable_region.start,
-                        usable_region.end
-                    );
-                    continue;
-                }
-            }
-            // Aligning addresses of too small a region can lead to problems, it is easier to discard it.
-            if end - start < PAGE_SIZE * 4 {
-                log::debug!(
-                    "Usable region {{start: 0x{:X}, end 0x{:X}}}, dropped. Too small ({}).",
-                    usable_region.start,
-                    usable_region.end,
-                    usable_region.end - usable_region.start
-                );
+        let mut start = usable_region.start;
+        let end = usable_region.end;
+        if start < ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64() {
+            start = ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64();
+            if end <= start {
+                // Region fully in first MB, skip
                 continue;
             }
-            // First usable page
-            let first_page = PhysAddr::new(start).align_up(PAGE_SIZE);
-            // Last usable page
-            // end - PAGE_SIZE needed because end is exclusive
-            let last_page = PhysAddr::new(end - PAGE_SIZE).align_down(PAGE_SIZE);
-            assert!(last_page > first_page);
-            assert!(last_page - first_page >= 4096);
-            usable_regions_list.push(UsableRegion {
-                first_page,
-                last_page,
-            })
         }
-        // Sort
-        usable_regions_list
-            .as_mut_slice()
-            .sort_unstable_by_key(|a| a.first_page);
-
-        // Collect usable ISA DMA regions
-        for usable_region in usable_regions_list.iter() {
-            let new_usable_region = adjust_usable_region(
-                usable_region,
-                ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR,
-                ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR,
-            );
-            if let Some(new_usable_region) = new_usable_region {
-                debug_assert!(new_usable_region.first_page <= new_usable_region.last_page);
-                debug_assert!(new_usable_region.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
-                debug_assert!(new_usable_region.last_page <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR);
-                ISA_DMA_USABLE_REGIONS.lock().push(new_usable_region);
-            }
+        // Aligning addresses of too small a region can lead to problems, it is easier to discard it.
+        if end - start < PAGE_SIZE * 4 {
+            continue;
         }
+        // First usable page
+        let first_page = PhysAddr::new(start).align_up(PAGE_SIZE);
+        // Last usable page
+        // end - PAGE_SIZE needed because end is exclusive
+        let last_page = PhysAddr::new(end - PAGE_SIZE).align_down(PAGE_SIZE);
+        assert!(last_page > first_page);
+        assert!(last_page - first_page >= 4096);
+        usable_regions_lock.push(UsableRegion {
+            first_page,
+            last_page,
+        })
+    }
+    // Sort
+    usable_regions_lock
+        .as_mut_slice()
+        .sort_unstable_by_key(|a| a.first_page);
 
-        // Collect usable DMA32 regions
-        for usable_region in usable_regions_list.iter() {
-            let new_usable_region = adjust_usable_region(
-                usable_region,
-                DMA32_MIN_FIRST_PAGE_ADDR,
-                DMA32_MAX_LAST_PAGE_ADDR,
-            );
-            if let Some(new_usable_region) = new_usable_region {
-                debug_assert!(new_usable_region.first_page <= new_usable_region.last_page);
-                debug_assert!(new_usable_region.first_page >= DMA32_MIN_FIRST_PAGE_ADDR);
-                debug_assert!(new_usable_region.last_page <= DMA32_MAX_LAST_PAGE_ADDR);
-                DMA32_USABLE_REGIONS.lock().push(new_usable_region);
-            }
-        }
-
-        // Collect usable HIGH regions
-        for usable_region in usable_regions_list.iter() {
-            let new_usable_region = adjust_usable_region(
-                usable_region,
-                HIGH_ZONE_MIN_FIRST_PAGE_ADDR,
-                HIGH_ZONE_MAX_LAST_PAGE_ADDR,
-            );
-            if let Some(new_usable_region) = new_usable_region {
-                debug_assert!(new_usable_region.first_page <= new_usable_region.last_page);
-                debug_assert!(new_usable_region.first_page >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR);
-                debug_assert!(new_usable_region.last_page <= HIGH_ZONE_MAX_LAST_PAGE_ADDR);
-                HIGH_USABLE_REGIONS.lock().push(new_usable_region);
-            }
-        }
-        drop(usable_regions_list);
-        // Debug checks
-        #[cfg(debug_assertions)]
-        {
-            for v in USABLE_REGIONS.lock().iter() {
-                assert!(v.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
-                assert!(v.first_page.is_aligned(PAGE_SIZE));
-                assert!(v.last_page.is_aligned(PAGE_SIZE));
-                assert!(v.first_page <= v.last_page);
-            }
-
-            for v in ISA_DMA_USABLE_REGIONS.lock().iter() {
-                assert!(v.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
-                assert!(v.last_page <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR);
-                assert!(v.first_page.is_aligned(PAGE_SIZE));
-                assert!(v.last_page.is_aligned(PAGE_SIZE));
-                assert!(v.first_page <= v.last_page);
-            }
-            for v in DMA32_USABLE_REGIONS.lock().iter() {
-                assert!(v.first_page >= DMA32_MIN_FIRST_PAGE_ADDR);
-                assert!(v.last_page <= DMA32_MAX_LAST_PAGE_ADDR);
-                assert!(v.first_page.is_aligned(PAGE_SIZE));
-                assert!(v.last_page.is_aligned(PAGE_SIZE));
-                assert!(v.first_page <= v.last_page);
-            }
-            for v in HIGH_USABLE_REGIONS.lock().iter() {
-                assert!(v.first_page >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR);
-                assert!(v.last_page <= HIGH_ZONE_MAX_LAST_PAGE_ADDR);
-                assert!(v.first_page.is_aligned(PAGE_SIZE));
-                assert!(v.last_page.is_aligned(PAGE_SIZE));
-                assert!(v.first_page <= v.last_page);
-            }
+    // Collect usable ISA DMA regions
+    for usable_region in usable_regions_lock.iter() {
+        let new_usable_region = adjust_usable_region(
+            usable_region,
+            ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR,
+            ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR,
+        );
+        if let Some(new_usable_region) = new_usable_region {
+            debug_assert!(new_usable_region.first_page <= new_usable_region.last_page);
+            debug_assert!(new_usable_region.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
+            debug_assert!(new_usable_region.last_page <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR);
+            ISA_DMA_USABLE_REGIONS.lock().push(new_usable_region);
         }
     }
 
-    // Init allocators
-    // Allocator initing:
-    // 1. Detect allocator range size: from first usable page, to last usable page
-    // 2. Calculate metadata size
-    // 3. Find place for metadata at usable physical memory chunk
-    // 4. Init allocator with alignment
-    // 5. Mark all memory as allocated
-    // 6. Mark available memory as free
-
-    // Init DMA allocator
-    #[allow(static_mut_refs)]
-    unsafe {
-        let isa_dma_usable_regions = ISA_DMA_USABLE_REGIONS.lock();
-        if isa_dma_usable_regions.len() != 0 {
-            // 1
-            let first_page = isa_dma_usable_regions.first().unwrap().first_page;
-            let last_page = isa_dma_usable_regions.last().unwrap().last_page;
-            let range_size = (last_page + PAGE_SIZE - first_page) as usize;
-
-            // 2
-            let metadata_size = BuddyAlloc::sizeof_alignment(range_size, PAGE_SIZE as usize)
-                .expect("Failed to calculate metadata size for ISA DMA allocator!");
-            assert!(metadata_size <= ISA_DMA_ALLOCATOR_METADATA.len());
-
-            // 4
-            ISA_DMA_ZONE.call_once(|| {
-                Mutex::new(MemoryZone {
-                    allocator: BuddyAlloc::init_alignment(
-                        ISA_DMA_ALLOCATOR_METADATA.as_mut_ptr(),
-                        first_page.as_u64() as *mut u8,
-                        range_size,
-                        PAGE_SIZE as usize,
-                    )
-                    .expect("Failed to init ISA DMA buddy allocator!"),
-                })
-            });
-
-            // 5
-            ISA_DMA_ZONE
-                .get()
-                .unwrap()
-                .lock()
-                .allocator
-                .reserve_range(first_page.as_u64() as *mut u8, range_size);
-
-            // 6
-            for usable_region in isa_dma_usable_regions.iter() {
-                let first_page = usable_region.first_page;
-                let range_size = usable_region.last_page + PAGE_SIZE - usable_region.first_page;
-                ISA_DMA_ZONE
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .allocator
-                    .unsafe_release_range(first_page.as_u64() as *mut u8, range_size as usize);
-            }
-            log::info!("ISA DMA allocator inited");
-        } else {
-            log::info!("ISA DMA allocator not inited. No memory.")
+    // Collect usable DMA32 regions
+    for usable_region in usable_regions_lock.iter() {
+        let new_usable_region = adjust_usable_region(
+            usable_region,
+            DMA32_MIN_FIRST_PAGE_ADDR,
+            DMA32_MAX_LAST_PAGE_ADDR,
+        );
+        if let Some(new_usable_region) = new_usable_region {
+            debug_assert!(new_usable_region.first_page <= new_usable_region.last_page);
+            debug_assert!(new_usable_region.first_page >= DMA32_MIN_FIRST_PAGE_ADDR);
+            debug_assert!(new_usable_region.last_page <= DMA32_MAX_LAST_PAGE_ADDR);
+            DMA32_USABLE_REGIONS.lock().push(new_usable_region);
         }
     }
 
-    // Init DMA32 allocator
-    #[allow(static_mut_refs)]
-    unsafe {
-        let dma32_usable_regions = DMA32_USABLE_REGIONS.lock();
-        if dma32_usable_regions.len() != 0 {
-            // 1
-            let first_page = dma32_usable_regions.first().unwrap().first_page;
-            let last_page = dma32_usable_regions.last().unwrap().last_page;
-            let range_size = (last_page + PAGE_SIZE - first_page) as usize;
-
-            // 2
-            let metadata_size = BuddyAlloc::sizeof_alignment(range_size, PAGE_SIZE as usize)
-                .expect("Failed to calculate metadata size for DMA32 allocator!");
-            assert!(metadata_size <= DMA32_ALLOCATOR_METADATA.len());
-
-            // 4
-            DMA32_ZONE.call_once(|| {
-                Mutex::new(MemoryZone {
-                    allocator: BuddyAlloc::init_alignment(
-                        DMA32_ALLOCATOR_METADATA.as_mut_ptr(),
-                        first_page.as_u64() as *mut u8,
-                        range_size,
-                        PAGE_SIZE as usize,
-                    )
-                    .expect("Failed to init DMA32 buddy allocator!"),
-                })
-            });
-
-            // 5
-            DMA32_ZONE
-                .get()
-                .unwrap()
-                .lock()
-                .allocator
-                .reserve_range(first_page.as_u64() as *mut u8, range_size);
-
-            // 6
-            for usable_region in dma32_usable_regions.iter() {
-                let first_page = usable_region.first_page;
-                let range_size = usable_region.last_page + PAGE_SIZE - usable_region.first_page;
-                DMA32_ZONE
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .allocator
-                    .unsafe_release_range(first_page.as_u64() as *mut u8, range_size as usize);
-            }
-            log::info!("DMA32 allocator inited");
-        } else {
-            log::info!("DMA32 allocator not inited. No memory.")
+    // Collect usable HIGH regions
+    for usable_region in usable_regions_lock.iter() {
+        let new_usable_region = adjust_usable_region(
+            usable_region,
+            HIGH_ZONE_MIN_FIRST_PAGE_ADDR,
+            HIGH_ZONE_MAX_LAST_PAGE_ADDR,
+        );
+        if let Some(new_usable_region) = new_usable_region {
+            debug_assert!(new_usable_region.first_page <= new_usable_region.last_page);
+            debug_assert!(new_usable_region.first_page >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR);
+            debug_assert!(new_usable_region.last_page <= HIGH_ZONE_MAX_LAST_PAGE_ADDR);
+            HIGH_USABLE_REGIONS.lock().push(new_usable_region);
         }
     }
-
-    // Init HIGH allocator
-    unsafe {
-        let high_usable_regions = HIGH_USABLE_REGIONS.lock();
-        if high_usable_regions.len() != 0 {
-            // 1
-            let first_page = high_usable_regions.first().unwrap().first_page;
-            let last_page = high_usable_regions.last().unwrap().last_page;
-            let range_size = (last_page + PAGE_SIZE - first_page) as usize;
-
-            // 2
-            let metadata_size = BuddyAlloc::sizeof_alignment(range_size, PAGE_SIZE as usize)
-                .expect("Failed to calculate metadata size for HIGH allocator!");
-
-            // 3
-            // For 32 GB with 4KB pages ~ 5 MB
-            // Try to allocate memory using DMA32 and DMA allocator
-            let high_allocator_metadata = 'metadata: {
-                // Try to allocate memory from DMA32
-                if let Some(dma32_zone) = DMA32_ZONE.get() {
-                    let ptr = dma32_zone.lock().allocator.malloc(metadata_size);
-                    if !ptr.is_null() {
-                        break 'metadata ptr;
-                    }
-                }
-                // Allocation from DMA32 failed, try to allocate from DMA
-                if let Some(isa_dma_zone) = ISA_DMA_ZONE.get() {
-                    let ptr = isa_dma_zone.lock().allocator.malloc(metadata_size);
-                    if !ptr.is_null() {
-                        break 'metadata ptr;
-                    }
-                }
-                // Failed to allocate memory
-                core::ptr::null_mut()
-            };
-            // If HIGH allocator initialization has started, it means that memory is more than 4 GB, and therefore we should definitely find memory in DMA32
-            assert!(!high_allocator_metadata.is_null(), "Failed to allocate memory for HIGH allocator's metadata! It's impossible, looks like bug!");
-            // 4
-            HIGH_ZONE.call_once(|| {
-                Mutex::new(MemoryZone {
-                    allocator: BuddyAlloc::init_alignment(
-                        high_allocator_metadata,
-                        first_page.as_u64() as *mut u8,
-                        range_size,
-                        PAGE_SIZE as usize,
-                    )
-                    .expect("Failed to init HIGH buddy allocator!"),
-                })
-            });
-
-            // 5
-            HIGH_ZONE
-                .get()
-                .unwrap()
-                .lock()
-                .allocator
-                .reserve_range(first_page.as_u64() as *mut u8, range_size);
-
-            // 6
-            for usable_region in high_usable_regions.iter() {
-                let first_page = usable_region.first_page;
-                let range_size = usable_region.last_page + PAGE_SIZE - usable_region.first_page;
-                HIGH_ZONE
-                    .get()
-                    .unwrap()
-                    .lock()
-                    .allocator
-                    .unsafe_release_range(first_page.as_u64() as *mut u8, range_size as usize);
-            }
-            log::info!("HIGH allocator inited");
-        } else {
-            log::info!("HIGH allocator not inited. No memory.")
+    // Debug checks
+    #[cfg(debug_assertions)]
+    {
+        drop(usable_regions_lock);
+        for v in USABLE_REGIONS.lock().iter() {
+            assert!(v.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
+            assert!(v.first_page.is_aligned(PAGE_SIZE));
+            assert!(v.last_page.is_aligned(PAGE_SIZE));
+            assert!(v.first_page <= v.last_page);
         }
-    }
 
-    if ISA_DMA_ZONE.get().is_none() && DMA32_ZONE.get().is_none() && HIGH_ZONE.get().is_none() {
-        panic!("Physical memory allocator initialization failed! All buddy allocators not inited!");
+        for v in ISA_DMA_USABLE_REGIONS.lock().iter() {
+            assert!(v.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
+            assert!(v.last_page <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR);
+            assert!(v.first_page.is_aligned(PAGE_SIZE));
+            assert!(v.last_page.is_aligned(PAGE_SIZE));
+            assert!(v.first_page <= v.last_page);
+        }
+        for v in DMA32_USABLE_REGIONS.lock().iter() {
+            assert!(v.first_page >= DMA32_MIN_FIRST_PAGE_ADDR);
+            assert!(v.last_page <= DMA32_MAX_LAST_PAGE_ADDR);
+            assert!(v.first_page.is_aligned(PAGE_SIZE));
+            assert!(v.last_page.is_aligned(PAGE_SIZE));
+            assert!(v.first_page <= v.last_page);
+        }
+        for v in HIGH_USABLE_REGIONS.lock().iter() {
+            assert!(v.first_page >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR);
+            assert!(v.last_page <= HIGH_ZONE_MAX_LAST_PAGE_ADDR);
+            assert!(v.first_page.is_aligned(PAGE_SIZE));
+            assert!(v.last_page.is_aligned(PAGE_SIZE));
+            assert!(v.first_page <= v.last_page);
+        }
     }
 }
 
@@ -512,6 +312,207 @@ fn adjust_usable_region(
     }
 
     Some(new_usable_region)
+}
+
+/// Inits array of SlabInfo pointers
+fn init_slab_info_ptrs_array() {
+
+}
+
+/// Inits zone allocators
+fn init_allocators() {
+    // Init allocators
+    // Allocator initing:
+    // 1. Detect allocator range size: from first usable page, to last usable page
+    // 2. Calculate metadata size
+    // 3. Find place for metadata at usable physical memory chunk
+    // 4. Init allocator with alignment
+    // 5. Mark all memory as allocated
+    // 6. Mark available memory as free
+
+    // Init DMA allocator
+    #[allow(static_mut_refs)]
+    unsafe {
+        let isa_dma_usable_regions_lock = ISA_DMA_USABLE_REGIONS.lock();
+        if isa_dma_usable_regions_lock.len() != 0 {
+            // 1
+            let first_page = isa_dma_usable_regions_lock.first().unwrap().first_page;
+            let last_page = isa_dma_usable_regions_lock.last().unwrap().last_page;
+            let range_size = (last_page + PAGE_SIZE - first_page) as usize;
+
+            // 2
+            let metadata_size = BuddyAlloc::sizeof_alignment(range_size, PAGE_SIZE as usize)
+                .expect("Failed to calculate metadata size for ISA DMA allocator!");
+            assert!(metadata_size <= ISA_DMA_ALLOCATOR_METADATA.len());
+
+            // 4
+            ISA_DMA_ZONE.call_once(|| {
+                Mutex::new(MemoryZone {
+                    allocator: BuddyAlloc::init_alignment(
+                        ISA_DMA_ALLOCATOR_METADATA.as_mut_ptr(),
+                        first_page.as_u64() as *mut u8,
+                        range_size,
+                        PAGE_SIZE as usize,
+                    )
+                        .expect("Failed to init ISA DMA buddy allocator!"),
+                })
+            });
+
+            // 5
+            ISA_DMA_ZONE
+                .get()
+                .unwrap()
+                .lock()
+                .allocator
+                .reserve_range(first_page.as_u64() as *mut u8, range_size);
+
+            // 6
+            for usable_region in isa_dma_usable_regions_lock.iter() {
+                let first_page = usable_region.first_page;
+                let range_size = usable_region.last_page + PAGE_SIZE - usable_region.first_page;
+                ISA_DMA_ZONE
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .allocator
+                    .unsafe_release_range(first_page.as_u64() as *mut u8, range_size as usize);
+            }
+            log::info!("ISA DMA allocator inited");
+        } else {
+            log::info!("ISA DMA allocator not inited. No memory.")
+        }
+    }
+
+    // Init DMA32 allocator
+    #[allow(static_mut_refs)]
+    unsafe {
+        let dma32_usable_regions_lock = DMA32_USABLE_REGIONS.lock();
+        if dma32_usable_regions_lock.len() != 0 {
+            // 1
+            let first_page = dma32_usable_regions_lock.first().unwrap().first_page;
+            let last_page = dma32_usable_regions_lock.last().unwrap().last_page;
+            let range_size = (last_page + PAGE_SIZE - first_page) as usize;
+
+            // 2
+            let metadata_size = BuddyAlloc::sizeof_alignment(range_size, PAGE_SIZE as usize)
+                .expect("Failed to calculate metadata size for DMA32 allocator!");
+            assert!(metadata_size <= DMA32_ALLOCATOR_METADATA.len());
+
+            // 4
+            DMA32_ZONE.call_once(|| {
+                Mutex::new(MemoryZone {
+                    allocator: BuddyAlloc::init_alignment(
+                        DMA32_ALLOCATOR_METADATA.as_mut_ptr(),
+                        first_page.as_u64() as *mut u8,
+                        range_size,
+                        PAGE_SIZE as usize,
+                    )
+                        .expect("Failed to init DMA32 buddy allocator!"),
+                })
+            });
+
+            // 5
+            DMA32_ZONE
+                .get()
+                .unwrap()
+                .lock()
+                .allocator
+                .reserve_range(first_page.as_u64() as *mut u8, range_size);
+
+            // 6
+            for usable_region in dma32_usable_regions_lock.iter() {
+                let first_page = usable_region.first_page;
+                let range_size = usable_region.last_page + PAGE_SIZE - usable_region.first_page;
+                DMA32_ZONE
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .allocator
+                    .unsafe_release_range(first_page.as_u64() as *mut u8, range_size as usize);
+            }
+            log::info!("DMA32 allocator inited");
+        } else {
+            log::info!("DMA32 allocator not inited. No memory.")
+        }
+    }
+
+    // Init HIGH allocator
+    unsafe {
+        let high_usable_regions_lock = HIGH_USABLE_REGIONS.lock();
+        if high_usable_regions_lock.len() != 0 {
+            // 1
+            let first_page = high_usable_regions_lock.first().unwrap().first_page;
+            let last_page = high_usable_regions_lock.last().unwrap().last_page;
+            let range_size = (last_page + PAGE_SIZE - first_page) as usize;
+
+            // 2
+            let metadata_size = BuddyAlloc::sizeof_alignment(range_size, PAGE_SIZE as usize)
+                .expect("Failed to calculate metadata size for HIGH allocator!");
+
+            // 3
+            // For 32 GB with 4KB pages ~ 5 MB
+            // Try to allocate memory using DMA32 and DMA allocator
+            let high_allocator_metadata = 'metadata: {
+                // Try to allocate memory from DMA32
+                if let Some(dma32_zone) = DMA32_ZONE.get() {
+                    let allocated_ptr = dma32_zone.lock().allocator.malloc(metadata_size);
+                    if !allocated_ptr.is_null() {
+                        break 'metadata allocated_ptr;
+                    }
+                }
+                // Allocation from DMA32 failed, try to allocate from DMA
+                if let Some(isa_dma_zone) = ISA_DMA_ZONE.get() {
+                    let allocated_ptr = isa_dma_zone.lock().allocator.malloc(metadata_size);
+                    if !allocated_ptr.is_null() {
+                        break 'metadata allocated_ptr;
+                    }
+                }
+                // Failed to allocate memory
+                null_mut()
+            };
+            // If HIGH allocator initialization has started, it means that memory is more than 4 GB, and therefore we should definitely find memory in DMA32
+            assert!(!high_allocator_metadata.is_null(), "Failed to allocate memory for HIGH allocator's metadata! It's impossible, looks like bug!");
+            // 4
+            HIGH_ZONE.call_once(|| {
+                Mutex::new(MemoryZone {
+                    allocator: BuddyAlloc::init_alignment(
+                        high_allocator_metadata,
+                        first_page.as_u64() as *mut u8,
+                        range_size,
+                        PAGE_SIZE as usize,
+                    )
+                        .expect("Failed to init HIGH buddy allocator!"),
+                })
+            });
+
+            // 5
+            HIGH_ZONE
+                .get()
+                .unwrap()
+                .lock()
+                .allocator
+                .reserve_range(first_page.as_u64() as *mut u8, range_size);
+
+            // 6
+            for usable_region in high_usable_regions_lock.iter() {
+                let first_page = usable_region.first_page;
+                let range_size = usable_region.last_page + PAGE_SIZE - usable_region.first_page;
+                HIGH_ZONE
+                    .get()
+                    .unwrap()
+                    .lock()
+                    .allocator
+                    .unsafe_release_range(first_page.as_u64() as *mut u8, range_size as usize);
+            }
+            log::info!("HIGH allocator inited");
+        } else {
+            log::info!("HIGH allocator not inited. No memory.")
+        }
+    }
+
+    if ISA_DMA_ZONE.get().is_none() && DMA32_ZONE.get().is_none() && HIGH_ZONE.get().is_none() {
+        panic!("Physical memory allocator initialization failed! All buddy allocators not inited!");
+    }
 }
 
 /// Allocs memory from zone using buddy allocators
