@@ -197,7 +197,6 @@ static USABLE_MEMORY_PAGES_NUMBER: Once<usize> = Once::new();
 
 /// Inits Physical Memory Manager and allocators
 pub fn init(boot_info: &bootloader_api::BootInfo) {
-    // Collect usable regions data
     collect_usable_regions(&*boot_info.memory_regions);
     init_slab_info_ptrs_array();
     init_allocators();
@@ -351,7 +350,7 @@ fn init_slab_info_ptrs_array() {
     // Calculate required memory size for store SlabInfo's
     // SlabInfo per page
     let number_of_slab_infos = *USABLE_MEMORY_PAGES_NUMBER.get().unwrap();
-    let mut required_memory_size = number_of_slab_infos * size_of::<Option<NonNull<SlabInfo>>>();
+    let mut required_memory_size = number_of_slab_infos * size_of::<*mut SlabInfo>();
     if required_memory_size % PAGE_SIZE != 0 {
         required_memory_size += PAGE_SIZE - (required_memory_size % PAGE_SIZE)
     }
@@ -382,7 +381,7 @@ fn init_slab_info_ptrs_array() {
     let slice: &'static mut [MaybeUninit<*mut SlabInfo>] = unsafe {
         core::slice::from_raw_parts_mut(required_memory_virt_addr.as_mut_ptr(), number_of_slab_infos)
     };
-    assert_eq!(slice.len() * size_of_val(&slice.first()), number_of_slab_infos * size_of::<*mut u8>());
+    assert_eq!(size_of_val(slice.first().unwrap()), size_of::<*mut u8>());
 }
 
 /// Inits zone allocators
