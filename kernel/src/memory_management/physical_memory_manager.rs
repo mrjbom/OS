@@ -1,7 +1,7 @@
-use core::mem::MaybeUninit;
 use super::{virtual_memory_manager, PAGE_SIZE};
 use bootloader_api::info::{MemoryRegion, MemoryRegionKind};
 use buddy_alloc::BuddyAlloc;
+use core::mem::MaybeUninit;
 use core::ptr::{null_mut, NonNull};
 use lazy_static::lazy_static;
 use slab_allocator::SlabInfo;
@@ -75,7 +75,8 @@ const ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR: PhysAddr = PhysAddr::new(0xFFF000);
 
 /// ISA DMA memory size
 #[allow(unused)]
-const ISA_DMA_ZONE_MAX_SIZE: usize = (ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR.as_u64() as usize + PAGE_SIZE
+const ISA_DMA_ZONE_MAX_SIZE: usize = (ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR.as_u64() as usize
+    + PAGE_SIZE
     - ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64() as usize);
 
 // DMA32
@@ -104,8 +105,8 @@ const DMA32_MAX_LAST_PAGE_ADDR: PhysAddr = PhysAddr::new(0xFFFF_F000);
 
 /// DMA memory size
 #[allow(unused)]
-const DMA32_MAX_SIZE: usize =
-    (DMA32_MAX_LAST_PAGE_ADDR.as_u64() as usize + PAGE_SIZE - DMA32_MIN_FIRST_PAGE_ADDR.as_u64() as usize);
+const DMA32_MAX_SIZE: usize = (DMA32_MAX_LAST_PAGE_ADDR.as_u64() as usize + PAGE_SIZE
+    - DMA32_MIN_FIRST_PAGE_ADDR.as_u64() as usize);
 
 // HIGH
 
@@ -205,7 +206,9 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
 /// Parses memory map and collects data about usable regions
 fn collect_usable_regions(memory_regions: &[MemoryRegion]) {
     let mut usable_regions_lock = USABLE_REGIONS.lock();
-    for usable_region in memory_regions.iter().filter(|usable_region| usable_region.kind == MemoryRegionKind::Usable)
+    for usable_region in memory_regions
+        .iter()
+        .filter(|usable_region| usable_region.kind == MemoryRegionKind::Usable)
     {
         let mut start = usable_region.start;
         let end = usable_region.end;
@@ -238,11 +241,11 @@ fn collect_usable_regions(memory_regions: &[MemoryRegion]) {
         .sort_unstable_by_key(|a| a.first_page);
 
     USABLE_MEMORY_RANGE_SIZE.call_once(|| {
-        (usable_regions_lock.last().unwrap().last_page + PAGE_SIZE as u64 - usable_regions_lock.first().unwrap().first_page) as usize
+        (usable_regions_lock.last().unwrap().last_page + PAGE_SIZE as u64
+            - usable_regions_lock.first().unwrap().first_page) as usize
     });
-    USABLE_MEMORY_PAGES_NUMBER.call_once(|| {
-        USABLE_MEMORY_RANGE_SIZE.get().unwrap() / PAGE_SIZE as usize
-    });
+    USABLE_MEMORY_PAGES_NUMBER
+        .call_once(|| USABLE_MEMORY_RANGE_SIZE.get().unwrap() / PAGE_SIZE as usize);
 
     // Collect usable ISA DMA regions
     for usable_region in usable_regions_lock.iter() {
@@ -369,17 +372,27 @@ fn init_slab_info_ptrs_array() {
             break;
         }
     }
-    assert!(!required_memory_phys_addr.is_null(), "Failed to find memory for SlabInfo pointers array");
+    assert!(
+        !required_memory_phys_addr.is_null(),
+        "Failed to find memory for SlabInfo pointers array"
+    );
     assert!(required_memory_phys_addr.is_aligned(align_of::<SlabInfo>() as u64));
-    assert!(USABLE_REGIONS.lock().is_sorted_by_key(|v| { v.first_page }), "Usable regions sort broken, looks like bug (probably the memory map is not quite right)");
+    assert!(
+        USABLE_REGIONS.lock().is_sorted_by_key(|v| { v.first_page }),
+        "Usable regions sort broken, looks like bug (probably the memory map is not quite right)"
+    );
 
     // Memory reserved, make slice
     // Convert to virtual address
-    let required_memory_virt_addr = virtual_memory_manager::phys_addr_to_cpmm_virt_addr(required_memory_phys_addr);
+    let required_memory_virt_addr =
+        virtual_memory_manager::phys_addr_to_cpmm_virt_addr(required_memory_phys_addr);
     // We don't init memory, because it's may be slow operation, there is no UB, because MaybeUninit used.
     // For example, a machine with 32 gigabytes of memory will need to initialize 64 megabytes.
     let slice: &'static mut [MaybeUninit<*mut SlabInfo>] = unsafe {
-        core::slice::from_raw_parts_mut(required_memory_virt_addr.as_mut_ptr(), number_of_slab_infos)
+        core::slice::from_raw_parts_mut(
+            required_memory_virt_addr.as_mut_ptr(),
+            number_of_slab_infos,
+        )
     };
     assert_eq!(size_of_val(slice.first().unwrap()), size_of::<*mut u8>());
 }
@@ -419,7 +432,7 @@ fn init_allocators() {
                         range_size,
                         PAGE_SIZE as usize,
                     )
-                        .expect("Failed to init ISA DMA buddy allocator!"),
+                    .expect("Failed to init ISA DMA buddy allocator!"),
                 })
             });
 
@@ -438,7 +451,10 @@ fn init_allocators() {
                     .unwrap()
                     .lock()
                     .allocator
-                    .unsafe_release_range(usable_region.first_page.as_u64() as *mut u8, usable_region.size());
+                    .unsafe_release_range(
+                        usable_region.first_page.as_u64() as *mut u8,
+                        usable_region.size(),
+                    );
             }
             log::info!("ISA DMA allocator inited");
         } else {
@@ -470,7 +486,7 @@ fn init_allocators() {
                         range_size,
                         PAGE_SIZE as usize,
                     )
-                        .expect("Failed to init DMA32 buddy allocator!"),
+                    .expect("Failed to init DMA32 buddy allocator!"),
                 })
             });
 
@@ -489,7 +505,10 @@ fn init_allocators() {
                     .unwrap()
                     .lock()
                     .allocator
-                    .unsafe_release_range(usable_region.first_page.as_u64() as *mut u8, usable_region.size());
+                    .unsafe_release_range(
+                        usable_region.first_page.as_u64() as *mut u8,
+                        usable_region.size(),
+                    );
             }
             log::info!("DMA32 allocator inited");
         } else {
@@ -542,7 +561,7 @@ fn init_allocators() {
                         range_size,
                         PAGE_SIZE as usize,
                     )
-                        .expect("Failed to init HIGH buddy allocator!"),
+                    .expect("Failed to init HIGH buddy allocator!"),
                 })
             });
 
@@ -561,7 +580,10 @@ fn init_allocators() {
                     .unwrap()
                     .lock()
                     .allocator
-                    .unsafe_release_range(usable_region.first_page.as_u64() as *mut u8, usable_region.size());
+                    .unsafe_release_range(
+                        usable_region.first_page.as_u64() as *mut u8,
+                        usable_region.size(),
+                    );
             }
             log::info!("HIGH allocator inited");
         } else {
