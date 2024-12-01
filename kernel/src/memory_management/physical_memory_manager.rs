@@ -337,10 +337,10 @@ fn init_slab_info_ptrs_array() {
 
     // Calculate required memory size for store SlabInfo's
     // SlabInfo per page from first usable to last usable
+    let last_usable_page_addr = USABLE_REGIONS.lock().last().unwrap().last_page.as_u64();
+    let first_usable_page_addr = USABLE_REGIONS.lock().first().unwrap().first_page.as_u64();
     let number_of_slab_infos =
-        (USABLE_REGIONS.lock().last().unwrap().last_page.as_u64() + PAGE_SIZE as u64
-            - USABLE_REGIONS.lock().first().unwrap().first_page.as_u64()) as usize
-            / PAGE_SIZE;
+        (last_usable_page_addr + PAGE_SIZE as u64 - first_usable_page_addr) as usize / PAGE_SIZE;
     let mut required_memory_size = number_of_slab_infos * size_of::<*mut SlabInfo>();
     if required_memory_size % PAGE_SIZE != 0 {
         required_memory_size += PAGE_SIZE - (required_memory_size % PAGE_SIZE)
