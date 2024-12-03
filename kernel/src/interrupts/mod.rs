@@ -1,4 +1,4 @@
-use x86_64::structures::idt::InterruptStackFrame;
+use x86_64::structures::idt::{ExceptionVector, InterruptStackFrame};
 
 mod idt;
 
@@ -22,13 +22,33 @@ pub fn init() {
 
 /// A general handler function for an interrupt or an exception with the interrupt/exception index and an optional error code
 pub fn general_handler_func(
-    _interrupt_stack_frame: InterruptStackFrame,
+    interrupt_stack_frame: InterruptStackFrame,
     index: u8,
-    _error_code: Option<u64>,
+    error_code: Option<u64>,
 ) {
     if index < 32 {
         // Exception
-        panic!("Exception {index} {_interrupt_stack_frame:#?}");
+        let exception = ExceptionVector::try_from(index)
+            .expect("Invalid exception vector number");
+
+        match exception {
+            ExceptionVector::Page => {
+                let cr2_virtual_address = x86_64::registers::control::Cr2::read().expect("Invalid address in CR2");
+                panic!(
+                    "Exception: {exception:?}\n\
+                    Error code: {error_code:#?}\n\
+                    CR2: 0x{cr2_virtual_address:X}
+                    {interrupt_stack_frame:#?}"
+                );
+            },
+            _ => {
+                panic!(
+                    "Exception: {exception:?}\n\
+                    Error code: {error_code:#?}\n\
+                    {interrupt_stack_frame:#?}"
+                );
+            },
+        }
     } else {
         // Hardware PIC interrupt
         #[allow(static_mut_refs)]

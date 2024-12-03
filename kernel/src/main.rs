@@ -44,7 +44,7 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     interrupts::init();
 
     // Init memory manager
-    log::info!("Memory manager initialization");
+    log::info!("Memory Manager initialization");
     memory_management::init(boot_info);
 
     x86_64::instructions::interrupts::disable();

@@ -196,31 +196,31 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
 
 /// Parses memory map and collects data about usable regions
 fn collect_usable_regions(memory_regions: &[MemoryRegion]) {
+    // Collect all usable regions
     let mut usable_regions_lock = USABLE_REGIONS.lock();
     for usable_region in memory_regions
         .iter()
         .filter(|usable_region| usable_region.kind == MemoryRegionKind::Usable)
     {
-        let mut start = usable_region.start;
-        let end = usable_region.end;
-        if start < ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64() {
-            start = ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64();
-            if end <= start {
-                // Region fully in first MB, skip
-                continue;
-            }
-        }
-        // Aligning addresses of too small a region can lead to problems, it is easier to discard it.
-        if end - start < PAGE_SIZE as u64 * 4 {
+        if usable_region.start < ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64() || usable_region.end > HIGH_ZONE_MAX_LAST_PAGE_ADDR.as_u64() {
             continue;
         }
-        // First usable page
-        let first_page = PhysAddr::new(start).align_up(PAGE_SIZE as u64);
-        // Last usable page
-        // end - PAGE_SIZE needed because end is exclusive
-        let last_page = PhysAddr::new(end - PAGE_SIZE as u64).align_down(PAGE_SIZE as u64);
-        assert!(last_page > first_page);
-        assert!(last_page - first_page >= 4096);
+
+        let mut first_page = PhysAddr::new(usable_region.start);
+        first_page.align_up(PAGE_SIZE as u64);
+        let mut last_page = PhysAddr::new(usable_region.end);
+        last_page -= PAGE_SIZE as u64;
+        last_page.align_down(PAGE_SIZE as u64);
+
+        if last_page <= first_page {
+            continue;
+        }
+        if last_page - first_page < PAGE_SIZE as u64 {
+            continue;
+        }
+        assert!(first_page.is_aligned(PAGE_SIZE as u64));
+        assert!(last_page.is_aligned(PAGE_SIZE as u64));
+
         usable_regions_lock.push(UsableRegion {
             first_page,
             last_page,
@@ -545,6 +545,10 @@ fn init_allocators() {
             };
             // If HIGH allocator initialization has started, it means that memory is more than 4 GB, and therefore we should definitely find memory in DMA32
             assert!(!high_allocator_metadata.is_null(), "Failed to allocate memory for HIGH allocator's metadata! It's impossible, looks like bug!");
+
+            // Convert physical address to virtual
+            let high_allocator_metadata = high_allocator_metadata.byte_add(virtual_memory_manager::PHYSICAL_MEMORY_MAPPING_OFFSET as usize);
+
             // 4
             HIGH_ZONE.call_once(|| {
                 Mutex::new(MemoryZone {
