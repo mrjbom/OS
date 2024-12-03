@@ -1,5 +1,5 @@
 KERNEL_DEBUG_FILE_PATH := "target/x86_64-unknown-none/debug/kernel" # kernel elf file
-BOOTABLE_ISO_FILE_PATH := "bootable.iso"
+BOOTABLE_IMG_FILE_PATH := "bootable.img"
 
 #RUN_DEV_QEMU_FLAGS := "-serial file:serial.log -monitor stdio"
 
@@ -16,19 +16,19 @@ build-dev:
 	@echo "Building kernel"
 	cargo build --package kernel --config kernel/config.toml
 	@echo "Creating bootable iso"
-	cargo run --package bootable-iso-builder -- {{KERNEL_DEBUG_FILE_PATH}} {{BOOTABLE_ISO_FILE_PATH}}
+	cargo run --package bootable-iso-builder -- {{KERNEL_DEBUG_FILE_PATH}} {{BOOTABLE_IMG_FILE_PATH}}
 
 # build-dev with verbose flags
 build-dev-verbose:
 	@echo "Building..."
 	@echo "Building kernel"
 	cargo build --package kernel --config kernel/config.toml --verbose
-	@echo "Creating bootable iso"
-	cargo run --package bootable-iso-builder -- {{KERNEL_DEBUG_FILE_PATH}} {{BOOTABLE_ISO_FILE_PATH}}
+	@echo "Creating bootable img"
+	cargo run --package bootable-img-builder -- {{KERNEL_DEBUG_FILE_PATH}} {{BOOTABLE_IMG_FILE_PATH}}
 
 # Build and run debug version
 run-dev: build-dev
-	qemu-system-x86_64 {{BOOTABLE_ISO_FILE_PATH}} {{RUN_DEV_QEMU_FLAGS}}
+	qemu-system-x86_64 -drive file={{BOOTABLE_IMG_FILE_PATH}},format=raw {{RUN_DEV_QEMU_FLAGS}}
 
 # Alias for build-dev
 b: build-dev
@@ -38,4 +38,4 @@ r: run-dev
 
 # Runs qemu for gdb debug
 rdbg: build-dev
-	qemu-system-x86_64 {{BOOTABLE_ISO_FILE_PATH}} {{RUN_DEV_QEMU_FLAGS}} -s -S
+	qemu-system-x86_64 -drive file={{BOOTABLE_IMG_FILE_PATH}},format=raw {{RUN_DEV_QEMU_FLAGS}} -s -S

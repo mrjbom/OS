@@ -1,5 +1,5 @@
 [workspace]
-members = ["kernel", "bootable-iso-builder"]
+members = ["kernel", "bootable-img-builder"]
 resolver = "2"
 
 [profile.dev]
