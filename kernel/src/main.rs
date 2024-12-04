@@ -33,7 +33,7 @@ bootloader_api::entry_point!(kmain, config = &BOOTLOADER_CONFIG);
 fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     com_ports::init();
     serial_debug::serial_logger::init();
-    log::info!("KERNEL START");
+    log::info!("--- KERNEL START ---");
 
     // Init GDT
     log::info!("GDT initialization");
@@ -48,7 +48,7 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     memory_management::init(boot_info);
 
     x86_64::instructions::interrupts::disable();
-    log::info!("KERNEL FINISH");
+    log::info!("--- KERNEL FINISH ---");
     loop {
         x86_64::instructions::hlt();
     }
