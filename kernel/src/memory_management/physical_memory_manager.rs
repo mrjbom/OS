@@ -226,6 +226,28 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
         }
         assert_eq!(was_found_n_times, 1);
     }
+
+    // Check free memory in allocator and regions
+    if let Some(zone) = ISA_DMA_ZONE.get() {
+        let free_memory_size = ISA_DMA_USABLE_REGIONS.lock().iter().map(|v| v.size()).sum();
+        unsafe {
+            assert_eq!(zone.lock().allocator.arena_size(), free_memory_size);
+        }
+    }
+
+    if let Some(zone) = DMA32_ZONE.get() {
+        let free_memory_size = DMA32_USABLE_REGIONS.lock().iter().map(|v| v.size()).sum();
+        unsafe {
+            assert_eq!(zone.lock().allocator.arena_size(), free_memory_size);
+        }
+    }
+
+    if let Some(zone) = HIGH_ZONE.get() {
+        let free_memory_size = HIGH_USABLE_REGIONS.lock().iter().map(|v| v.size()).sum();
+        unsafe {
+            assert_eq!(zone.lock().allocator.arena_size(), free_memory_size);
+        }
+    }
 }
 
 /// Parses memory map and collects data about usable regions
