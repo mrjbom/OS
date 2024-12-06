@@ -58,8 +58,6 @@ type MemoryZonesAndPrioritySpecifier = [MemoryZoneEnum];
 ///
 /// First usable page: 0x100000
 ///
-/// Last priority for allocations
-///
 /// Last usable page: 0xFFF000
 static ISA_DMA_ZONE: Once<Mutex<MemoryZone>> = Once::new();
 
@@ -86,8 +84,6 @@ const ISA_DMA_ZONE_MAX_SIZE: usize = (ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR.as_u64() a
 ///
 /// PCI
 ///
-/// Second priority for allocations
-///
 /// First usable page: 0x1000000
 ///
 /// Last usable page: 0xFFFF_F000
@@ -112,8 +108,6 @@ const DMA32_MAX_SIZE: usize = (DMA32_MAX_LAST_PAGE_ADDR.as_u64() as usize + PAGE
 // HIGH
 
 /// HIGH zone: 4 GB - 1 TB
-///
-/// Max priority for allocations
 ///
 /// First usable page: 0x1_0000_0000
 ///
@@ -295,9 +289,9 @@ fn collect_usable_regions(memory_regions: &[MemoryRegion]) {
             ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR,
         );
         if let Some(new_usable_region) = new_usable_region {
-            debug_assert!(new_usable_region.first_page <= new_usable_region.last_page);
-            debug_assert!(new_usable_region.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
-            debug_assert!(new_usable_region.last_page <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR);
+            assert!(new_usable_region.first_page <= new_usable_region.last_page);
+            assert!(new_usable_region.first_page >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR);
+            assert!(new_usable_region.last_page <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR);
             ISA_DMA_USABLE_REGIONS.lock().push(new_usable_region);
         }
     }
@@ -310,9 +304,9 @@ fn collect_usable_regions(memory_regions: &[MemoryRegion]) {
             DMA32_MAX_LAST_PAGE_ADDR,
         );
         if let Some(new_usable_region) = new_usable_region {
-            debug_assert!(new_usable_region.first_page <= new_usable_region.last_page);
-            debug_assert!(new_usable_region.first_page >= DMA32_MIN_FIRST_PAGE_ADDR);
-            debug_assert!(new_usable_region.last_page <= DMA32_MAX_LAST_PAGE_ADDR);
+            assert!(new_usable_region.first_page <= new_usable_region.last_page);
+            assert!(new_usable_region.first_page >= DMA32_MIN_FIRST_PAGE_ADDR);
+            assert!(new_usable_region.last_page <= DMA32_MAX_LAST_PAGE_ADDR);
             DMA32_USABLE_REGIONS.lock().push(new_usable_region);
         }
     }
@@ -325,9 +319,9 @@ fn collect_usable_regions(memory_regions: &[MemoryRegion]) {
             HIGH_ZONE_MAX_LAST_PAGE_ADDR,
         );
         if let Some(new_usable_region) = new_usable_region {
-            debug_assert!(new_usable_region.first_page <= new_usable_region.last_page);
-            debug_assert!(new_usable_region.first_page >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR);
-            debug_assert!(new_usable_region.last_page <= HIGH_ZONE_MAX_LAST_PAGE_ADDR);
+            assert!(new_usable_region.first_page <= new_usable_region.last_page);
+            assert!(new_usable_region.first_page >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR);
+            assert!(new_usable_region.last_page <= HIGH_ZONE_MAX_LAST_PAGE_ADDR);
             HIGH_USABLE_REGIONS.lock().push(new_usable_region);
         }
     }
@@ -372,6 +366,9 @@ fn adjust_usable_region(
     limit_first_page: PhysAddr,
     limit_last_page: PhysAddr,
 ) -> Option<UsableRegion> {
+    assert!(usable_region.size() >= PAGE_SIZE);
+    assert!(limit_first_page < limit_last_page);
+
     if usable_region.last_page < limit_first_page || usable_region.first_page > limit_last_page {
         return None;
     }
@@ -688,12 +685,12 @@ fn init_allocators() {
 /// May be slow because may wait lock
 ///
 /// # Safety
-/// May return null pointer<br>
+/// May return null address<br>
 /// Allocated memory is uninitialized
 pub unsafe fn alloc(
     memory_zones_and_priority_specifier: &MemoryZonesAndPrioritySpecifier,
     requested_size: usize,
-) -> *mut u8 {
+) -> PhysAddr {
     debug_assert_ne!(requested_size, 0, "Trying to alloc zero sized block");
     debug_assert!(
         requested_size.is_power_of_two(),
@@ -716,11 +713,12 @@ pub unsafe fn alloc(
                     .malloc(requested_size)
             };
             if !allocated_ptr.is_null() {
-                return allocated_ptr;
+                debug_assert_eq!(allocated_ptr as usize % PAGE_SIZE, 0, "Buddy allocator allocates non aligned address");
+                return PhysAddr::new(allocated_ptr as u64);
             }
         }
     }
-    null_mut()
+    PhysAddr::zero()
 }
 
 /// Frees memory to buddy allocator
@@ -729,20 +727,28 @@ pub unsafe fn alloc(
 ///
 /// # Safety
 /// Freed memory must be previously allocated memory
-pub unsafe fn free(freed_ptr: *mut u8, memory_zone_enum: MemoryZoneEnum) {
-    debug_assert!(!freed_ptr.is_null(), "Trying to free null pointer");
-    debug_assert!(freed_ptr as usize % PAGE_SIZE == 0, "Trying to free non aligned");
-    let memory_zone = match memory_zone_enum {
-        MemoryZoneEnum::IsaDma => &ISA_DMA_ZONE,
-        MemoryZoneEnum::Dma32 => &DMA32_ZONE,
-        MemoryZoneEnum::High => &HIGH_ZONE,
+pub unsafe fn free(freed_addr: PhysAddr) {
+    debug_assert!(!freed_addr.is_null(), "Trying to free null address");
+    debug_assert!(freed_addr.is_aligned(PAGE_SIZE as u64), "Trying to free non aligned address");
+
+    let memory_zone = {
+        if freed_addr >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR && freed_addr <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR {
+            &ISA_DMA_ZONE
+        } else if freed_addr >= DMA32_MIN_FIRST_PAGE_ADDR && freed_addr <= DMA32_MAX_LAST_PAGE_ADDR {
+            &DMA32_ZONE
+        } else if freed_addr >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR && freed_addr <= HIGH_ZONE_MAX_LAST_PAGE_ADDR {
+            &HIGH_ZONE
+        } else {
+            unreachable!("Trying to free invalid address");
+        }
     };
+
     unsafe {
         memory_zone
             .get()
             .expect("Trying to free memory from non-existing zone")
             .lock()
             .allocator
-            .free(freed_ptr);
+            .free(freed_addr.as_u64() as *mut u8);
     }
 }
