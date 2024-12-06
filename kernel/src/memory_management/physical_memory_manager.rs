@@ -189,33 +189,89 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
     init_allocators();
 
     // Check lists
-    assert!(USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.first_page));
-    assert!(USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.last_page));
-    assert!(USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.size() >= PAGE_SIZE));
+    assert!(USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.first_page));
+    assert!(USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.last_page));
+    assert!(USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.size() >= PAGE_SIZE));
 
-    assert!(ISA_DMA_USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.first_page));
-    assert!(ISA_DMA_USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.last_page));
-    assert!(ISA_DMA_USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.size() >= PAGE_SIZE));
+    assert!(ISA_DMA_USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.first_page));
+    assert!(ISA_DMA_USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.last_page));
+    assert!(ISA_DMA_USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.size() >= PAGE_SIZE));
 
-    assert!(DMA32_USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.first_page));
-    assert!(DMA32_USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.last_page));
-    assert!(DMA32_USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.size() >= PAGE_SIZE));
+    assert!(DMA32_USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.first_page));
+    assert!(DMA32_USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.last_page));
+    assert!(DMA32_USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.size() >= PAGE_SIZE));
 
-    assert!(HIGH_USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.first_page));
-    assert!(HIGH_USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.last_page));
-    assert!(HIGH_USABLE_REGIONS.lock().iter().is_sorted_by_key(|v| v.size() >= PAGE_SIZE));
+    assert!(HIGH_USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.first_page));
+    assert!(HIGH_USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.last_page));
+    assert!(HIGH_USABLE_REGIONS
+        .lock()
+        .iter()
+        .is_sorted_by_key(|v| v.size() >= PAGE_SIZE));
 
-    assert_eq!(USABLE_REGIONS.lock().len(), ISA_DMA_USABLE_REGIONS.lock().len() + DMA32_USABLE_REGIONS.lock().len() + HIGH_USABLE_REGIONS.lock().len());
+    assert_eq!(
+        USABLE_REGIONS.lock().len(),
+        ISA_DMA_USABLE_REGIONS.lock().len()
+            + DMA32_USABLE_REGIONS.lock().len()
+            + HIGH_USABLE_REGIONS.lock().len()
+    );
 
     for some_region in USABLE_REGIONS.lock().iter() {
         let mut was_found_n_times = 0;
-        if ISA_DMA_USABLE_REGIONS.lock().iter().find(|dma_region| some_region == *dma_region).is_some() {
+        if ISA_DMA_USABLE_REGIONS
+            .lock()
+            .iter()
+            .find(|dma_region| some_region == *dma_region)
+            .is_some()
+        {
             was_found_n_times += 1;
         }
-        if DMA32_USABLE_REGIONS.lock().iter().find(|dma32_region| some_region == *dma32_region).is_some() {
+        if DMA32_USABLE_REGIONS
+            .lock()
+            .iter()
+            .find(|dma32_region| some_region == *dma32_region)
+            .is_some()
+        {
             was_found_n_times += 1;
         }
-        if HIGH_USABLE_REGIONS.lock().iter().find(|high_region| some_region == *high_region).is_some() {
+        if HIGH_USABLE_REGIONS
+            .lock()
+            .iter()
+            .find(|high_region| some_region == *high_region)
+            .is_some()
+        {
             was_found_n_times += 1;
         }
         assert_eq!(was_found_n_times, 1);
@@ -252,7 +308,9 @@ fn collect_usable_regions(memory_regions: &[MemoryRegion]) {
         .iter()
         .filter(|usable_region| usable_region.kind == MemoryRegionKind::Usable)
     {
-        if usable_region.start < ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64() || usable_region.end > HIGH_ZONE_MAX_LAST_PAGE_ADDR.as_u64() {
+        if usable_region.start < ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR.as_u64()
+            || usable_region.end > HIGH_ZONE_MAX_LAST_PAGE_ADDR.as_u64()
+        {
             continue;
         }
 
@@ -630,7 +688,8 @@ fn init_allocators() {
             assert!(!high_allocator_metadata.is_null(), "Failed to allocate memory for HIGH allocator's metadata! It's impossible, looks like bug!");
 
             // Convert physical address to virtual
-            let high_allocator_metadata = high_allocator_metadata.byte_add(virtual_memory_manager::PHYSICAL_MEMORY_MAPPING_OFFSET as usize);
+            let high_allocator_metadata = high_allocator_metadata
+                .byte_add(virtual_memory_manager::PHYSICAL_MEMORY_MAPPING_OFFSET as usize);
 
             // 4
             HIGH_ZONE.call_once(|| {
@@ -713,7 +772,11 @@ pub unsafe fn alloc(
                     .malloc(requested_size)
             };
             if !allocated_ptr.is_null() {
-                debug_assert_eq!(allocated_ptr as usize % PAGE_SIZE, 0, "Buddy allocator allocates non aligned address");
+                debug_assert_eq!(
+                    allocated_ptr as usize % PAGE_SIZE,
+                    0,
+                    "Buddy allocator allocates non aligned address"
+                );
                 return PhysAddr::new(allocated_ptr as u64);
             }
         }
@@ -729,14 +792,22 @@ pub unsafe fn alloc(
 /// Freed memory must be previously allocated memory
 pub unsafe fn free(freed_addr: PhysAddr) {
     debug_assert!(!freed_addr.is_null(), "Trying to free null address");
-    debug_assert!(freed_addr.is_aligned(PAGE_SIZE as u64), "Trying to free non aligned address");
+    debug_assert!(
+        freed_addr.is_aligned(PAGE_SIZE as u64),
+        "Trying to free non aligned address"
+    );
 
     let memory_zone = {
-        if freed_addr >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR && freed_addr <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR {
+        if freed_addr >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR
+            && freed_addr <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR
+        {
             &ISA_DMA_ZONE
-        } else if freed_addr >= DMA32_MIN_FIRST_PAGE_ADDR && freed_addr <= DMA32_MAX_LAST_PAGE_ADDR {
+        } else if freed_addr >= DMA32_MIN_FIRST_PAGE_ADDR && freed_addr <= DMA32_MAX_LAST_PAGE_ADDR
+        {
             &DMA32_ZONE
-        } else if freed_addr >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR && freed_addr <= HIGH_ZONE_MAX_LAST_PAGE_ADDR {
+        } else if freed_addr >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR
+            && freed_addr <= HIGH_ZONE_MAX_LAST_PAGE_ADDR
+        {
             &HIGH_ZONE
         } else {
             unreachable!("Trying to free invalid address");

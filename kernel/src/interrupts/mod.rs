@@ -28,26 +28,26 @@ pub fn general_handler_func(
 ) {
     if index < 32 {
         // Exception
-        let exception = ExceptionVector::try_from(index)
-            .expect("Invalid exception vector number");
+        let exception = ExceptionVector::try_from(index).expect("Invalid exception vector number");
 
         match exception {
             ExceptionVector::Page => {
-                let cr2_virtual_address = x86_64::registers::control::Cr2::read().expect("Invalid address in CR2");
+                let cr2_virtual_address =
+                    x86_64::registers::control::Cr2::read().expect("Invalid address in CR2");
                 panic!(
                     "Exception: {exception:?}\n\
                     Error code: {error_code:#?}\n\
                     CR2: 0x{cr2_virtual_address:X}
                     {interrupt_stack_frame:#?}"
                 );
-            },
+            }
             _ => {
                 panic!(
                     "Exception: {exception:?}\n\
                     Error code: {error_code:#?}\n\
                     {interrupt_stack_frame:#?}"
                 );
-            },
+            }
         }
     } else {
         // Hardware PIC interrupt
