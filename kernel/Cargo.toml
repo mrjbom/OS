@@ -14,6 +14,6 @@ log = "0.4.22"
 pic8259 = "0.11.0"
 tinyvec = "1.8.0"
 
-# My buddy_alloc library wrapper
+# My
 buddy_alloc = { git = "https://github.com/mrjbom/buddy_alloc_rs.git" }
 slab_allocator = { git = "https://github.com/mrjbom/slab_allocator.git" }
