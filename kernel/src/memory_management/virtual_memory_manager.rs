@@ -21,7 +21,7 @@ pub fn init() {
     let (pml4, _) = x86_64::registers::control::Cr3::read();
     assert!(!pml4.start_address().is_null());
     let pml4 = phys_addr_to_cpmm_virt_addr(pml4.start_address());
-    let pml4 = unsafe { pml4.as_mut_ptr::<PageTable>() };
+    let pml4 = pml4.as_mut_ptr::<PageTable>();
     // Unmap first 128 TB
     for i in 0..256 {
         unsafe {
