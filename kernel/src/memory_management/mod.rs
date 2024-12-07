@@ -8,4 +8,6 @@ const PAGE_SIZE: usize = 4096;
 pub fn init(boot_info: &bootloader_api::BootInfo) {
     log::info!("Physical Memory Manager initialization");
     physical_memory_manager::init(boot_info);
+    log::info!("Virtual Memory Manager initialization");
+    virtual_memory_manager::init();
 }
