@@ -680,6 +680,14 @@ fn init_allocators() {
                             break;
                         }
                     }
+
+                    // Mark allocated memory in DMA32 allocator
+                    DMA32_ZONE
+                        .get()
+                        .unwrap()
+                        .lock()
+                        .allocator
+                        .reserve_range(high_allocator_metadata, metadata_size);
                     break;
                 }
             }
