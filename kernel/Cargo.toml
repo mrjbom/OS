@@ -13,6 +13,8 @@ lazy_static = { version = "1.5.0", features = ["spin_no_std"] }
 log = "0.4.22"
 pic8259 = "0.11.0"
 tinyvec = "1.8.0"
+raw-cpuid = "11.2.0"
+acpi = { version = "5.1.0", default-features = false }
 
 # My
 buddy_alloc = { git = "https://github.com/mrjbom/buddy_alloc_rs.git" }

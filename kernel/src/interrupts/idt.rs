@@ -1,4 +1,4 @@
-use super::general_handler_func;
+use super::general_interrupt_handler;
 use x86_64::structures::idt::InterruptDescriptorTable;
 
 static mut IDT: InterruptDescriptorTable = InterruptDescriptorTable::new();
@@ -7,7 +7,7 @@ static mut IDT: InterruptDescriptorTable = InterruptDescriptorTable::new();
 pub fn init() {
     #[allow(static_mut_refs)]
     unsafe {
-        x86_64::set_general_handler!(&mut IDT, general_handler_func);
+        x86_64::set_general_handler!(&mut IDT, general_interrupt_handler);
         // Loads IDT using lidt
         IDT.load();
     }

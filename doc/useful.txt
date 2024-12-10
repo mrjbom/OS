@@ -1,0 +1,2 @@
+Not a bad tutorial that can be used to familiarize with APIC. But it is better to read Intel Manual in parallel, because there are some inaccuracies.
+http://www.osdever.net/tutorials/view/multiprocessing-support-for-hobby-oses-explained

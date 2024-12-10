@@ -1,6 +1,8 @@
 use x86_64::instructions::tlb;
-use x86_64::structures::paging::PageTable;
+use x86_64::structures::paging::page_table::PageTableLevel;
+use x86_64::structures::paging::{PageTable, PageTableFlags};
 use x86_64::{PhysAddr, VirtAddr};
+
 // TODO: Idea: Add different wrapper types for virtual addresses belonging to different areas,
 // this is due to the fact that their conversion to physical addresses may differ.
 // A virtual address from a Complete Physical Memory Mapping area can be easily converted to a physical address,
@@ -35,7 +37,7 @@ pub fn init() {
 ///
 /// Adds PHYSICAL_MEMORY_MAPPING_OFFSET to physical address
 #[inline]
-pub fn phys_addr_to_cpmm_virt_addr(phys_addr: PhysAddr) -> VirtAddr {
+pub const fn phys_addr_to_cpmm_virt_addr(phys_addr: PhysAddr) -> VirtAddr {
     VirtAddr::new(phys_addr.as_u64() + PHYSICAL_MEMORY_MAPPING_OFFSET)
 }
 
@@ -43,6 +45,54 @@ pub fn phys_addr_to_cpmm_virt_addr(phys_addr: PhysAddr) -> VirtAddr {
 ///
 /// Subs PHYSICAL_MEMORY_MAPPING_OFFSET from virtual address
 #[inline]
-pub fn virt_addr_from_cpmm_to_phys_addr(virt_addr: VirtAddr) -> PhysAddr {
+pub const fn virt_addr_from_cpmm_to_phys_addr(virt_addr: VirtAddr) -> PhysAddr {
     PhysAddr::new(virt_addr.as_u64() - PHYSICAL_MEMORY_MAPPING_OFFSET)
+}
+
+/// Sets flags to value in selected page table level by virtual addr
+///
+/// # Attention!<br>
+/// Since 2 MB pages may be used (for example, by bootloader complete physical memory mapping) where PT does not exist, instead of PT, the flags will be applied to PD.
+///
+/// Doesn't flush TLB
+pub fn set_flags_in_page_table(
+    virt_addr: VirtAddr,
+    page_table_level: PageTableLevel,
+    page_table_flags: PageTableFlags,
+    value: bool,
+) {
+    let mut current_level = PageTableLevel::Four;
+    let mut page_table_phys_addr = x86_64::registers::control::Cr3::read().0.start_address();
+    loop {
+        let page_table_virt_addr = phys_addr_to_cpmm_virt_addr(page_table_phys_addr);
+        let page_table = page_table_virt_addr.as_mut_ptr::<PageTable>();
+        debug_assert!(!page_table.is_null(), "Page table null ptr");
+        debug_assert!(page_table.is_aligned(), "Not aligned page table address");
+
+        let index = virt_addr.page_table_index(current_level);
+        // PT change requested, we are now checking PD. Due to two megabyte pages PT may not exist, we need to check this.
+        if current_level == PageTableLevel::Two && page_table_level == PageTableLevel::One {
+            // Check if 2 MB pages used
+            let pd = page_table;
+            unsafe {
+                // 2 MB page used, PT not exist
+                if (*pd)[index].flags().contains(PageTableFlags::HUGE_PAGE) {
+                    let mut flags = (*pd)[index].flags();
+                    flags.set(page_table_flags, value);
+                    (*pd)[index].set_flags(flags);
+                    break;
+                }
+            }
+        }
+        if current_level == page_table_level {
+            unsafe {
+                let mut flags = (*page_table)[index].flags();
+                flags.set(page_table_flags, value);
+                (*page_table)[index].set_flags(flags);
+            }
+            break;
+        }
+        current_level = current_level.next_lower_level().unwrap();
+        page_table_phys_addr = unsafe { (*page_table)[index].addr() };
+    }
 }

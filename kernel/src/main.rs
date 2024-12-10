@@ -39,13 +39,17 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("GDT initialization");
     gdt::init();
 
-    // Init and enable interrupts
-    log::info!("Interrupts initialization and enabling");
+    // Init and enable interrupts with PIC
+    log::info!("Interrupts initialization and enabling (PIC)");
     interrupts::init();
 
     // Init memory manager
     log::info!("Memory Manager initialization");
     memory_management::init(boot_info);
+
+    // Init APIC
+    log::info!("APIC interrupts initialization and enabling");
+    interrupts::go_to_apic(boot_info);
 
     x86_64::instructions::interrupts::disable();
     log::info!("--- KERNEL FINISH ---");
