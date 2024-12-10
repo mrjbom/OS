@@ -1,6 +1,5 @@
 use crate::memory_management::virtual_memory_manager::{self, PHYSICAL_MEMORY_MAPPING_OFFSET};
 use crate::memory_management::PAGE_SIZE;
-use acpi::PhysicalMapping;
 use bootloader_api::BootInfo;
 use core::ptr::NonNull;
 use raw_cpuid::CpuId;
@@ -48,14 +47,6 @@ pub fn init(boot_info: &BootInfo) {
         .rsdp_addr
         .into_option()
         .expect("ACPI RSDP address not detected by bootloader!");
-
-    // Validate RSDP
-    let rsdp =
-        VirtAddr::new(boot_info.rsdp_addr.into_option().unwrap() + PHYSICAL_MEMORY_MAPPING_OFFSET)
-            .as_ptr::<acpi::rsdp::Rsdp>();
-    unsafe {
-        (*rsdp).validate().expect("Invalid RSDP!");
-    }
 
     // Check APIC base address from MSR
     let ia32_apic_base_msr = unsafe { x86_64::registers::model_specific::Msr::new(0x1B).read() };
@@ -168,45 +159,5 @@ fn fill_spurious_interrupt_vector_register() {
     register_value |= super::ACPI_SPURIOUS_IDT_VECTOR as u32;
     unsafe {
         SPURIOUS_INTERRUPT_VECTOR_REGISTER.write_volatile(register_value);
-    }
-}
-
-#[derive(Clone)]
-struct MyAcpiHandler;
-
-impl acpi::AcpiHandler for MyAcpiHandler {
-    unsafe fn map_physical_region<T>(
-        &self,
-        physical_address: usize,
-        size: usize,
-    ) -> PhysicalMapping<Self, T> {
-        // We just need to return the virtual address from Complete Physical Memory Mapping region
-
-        let physical_region_start = x86_64::align_down(physical_address as u64, PAGE_SIZE as u64);
-        let physical_region_size = {
-            let size = physical_address as u64 - physical_region_start;
-            if size == 0 {
-                PAGE_SIZE
-            } else {
-                x86_64::align_up(size, PAGE_SIZE as u64) as usize
-            }
-        };
-        debug_assert_eq!(physical_region_start as usize % PAGE_SIZE, 0);
-        debug_assert!(size >= PAGE_SIZE);
-
-        let virtual_address =
-            VirtAddr::new(physical_address as u64 + PHYSICAL_MEMORY_MAPPING_OFFSET);
-
-        PhysicalMapping::new(
-            physical_address,
-            NonNull::new(virtual_address.as_mut_ptr::<T>()).unwrap(),
-            size_of::<T>(),
-            physical_region_size,
-            self.clone(),
-        )
-    }
-
-    fn unmap_physical_region<T>(_region: &PhysicalMapping<Self, T>) {
-        // There is no need to do anything
     }
 }
