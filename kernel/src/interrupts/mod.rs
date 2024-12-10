@@ -1,5 +1,3 @@
-use crate::interrupts::pic::PICS;
-use bootloader_api::BootInfo;
 use core::ops::RangeInclusive;
 use x86_64::structures::idt::{ExceptionVector, InterruptStackFrame};
 
@@ -22,9 +20,9 @@ pub fn init() {
 }
 
 /// Disables PIC and inits local APIC, enables interrupts
-pub fn go_to_apic(boot_info: &BootInfo) {
+pub fn go_to_apic() {
     // Init local APIC
-    apic::init(boot_info);
+    apic::init();
 
     // Enable interrupts
     x86_64::instructions::interrupts::enable();
@@ -64,25 +62,25 @@ pub fn general_interrupt_handler(
                         x86_64::registers::control::Cr2::read().expect("Invalid address in CR2");
                     panic!(
                         "Exception: {exception:?}\n\
-                    Error code: {error_code:#?}\n\
-                    CR2: 0x{cr2_virtual_address:X}
-                    {interrupt_stack_frame:#?}"
+                        Error code: {error_code:#?}\n\
+                        CR2: 0x{cr2_virtual_address:X}
+                        {interrupt_stack_frame:#?}"
                     );
                 }
                 _ => {
                     panic!(
                         "Exception: {exception:?}\n\
-                    Error code: {error_code:#?}\n\
-                    {interrupt_stack_frame:#?}"
+                        Error code: {error_code:#?}\n\
+                        {interrupt_stack_frame:#?}"
                     );
                 }
             }
         }
         index if PIC_IDT_VECTORS_RANGE.contains(&index) => {
-            // Hardware PIC interrupt
+            // PIC interrupt
             #[allow(static_mut_refs)]
             unsafe {
-                PICS.notify_end_of_interrupt(index)
+                pic::PICS.notify_end_of_interrupt(index)
             };
         }
         ACPI_TIMER_IDT_VECTOR => {

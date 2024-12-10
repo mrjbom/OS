@@ -1,7 +1,5 @@
-use crate::memory_management::virtual_memory_manager::{self, PHYSICAL_MEMORY_MAPPING_OFFSET};
+use crate::memory_management::virtual_memory_manager;
 use crate::memory_management::PAGE_SIZE;
-use bootloader_api::BootInfo;
-use core::ptr::NonNull;
 use raw_cpuid::CpuId;
 use x86_64::instructions::tlb;
 use x86_64::structures::paging::page_table::PageTableLevel;
@@ -30,9 +28,8 @@ const LVT_LINT1_REGISTER: *mut u32 = (LOCAL_APIC_BASE_MAPPED_ADDR.as_u64() + 0x3
 /// 0x370   LVT Error Register
 const LVT_ERROR_REGISTER: *mut u32 = (LOCAL_APIC_BASE_MAPPED_ADDR.as_u64() + 0x370) as *mut u32;
 
-pub fn init(boot_info: &BootInfo) {
+pub fn init() {
     // Check APIC support
-    log::info!("Checking APIC support");
     let cpuid = CpuId::new();
     let cpuid_feature_info = cpuid
         .get_feature_info()
@@ -40,13 +37,6 @@ pub fn init(boot_info: &BootInfo) {
     if !cpuid_feature_info.has_apic() {
         panic!("APIC not supported");
     }
-
-    // Check ACPI RSDP address
-    log::info!("Checking ACPI RSDP address");
-    boot_info
-        .rsdp_addr
-        .into_option()
-        .expect("ACPI RSDP address not detected by bootloader!");
 
     // Check APIC base address from MSR
     let ia32_apic_base_msr = unsafe { x86_64::registers::model_specific::Msr::new(0x1B).read() };

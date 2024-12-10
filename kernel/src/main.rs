@@ -4,6 +4,7 @@
 
 use bootloader_api::config::Mapping;
 
+mod acpi;
 mod com_ports;
 mod gdt;
 mod interrupts;
@@ -40,7 +41,7 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     gdt::init();
 
     // Init and enable interrupts with PIC
-    log::info!("Interrupts initialization and enabling (PIC)");
+    log::info!("PIC interrupts initialization and enabling");
     interrupts::init();
 
     // Init memory manager
@@ -49,7 +50,11 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
 
     // Init APIC
     log::info!("APIC interrupts initialization and enabling");
-    interrupts::go_to_apic(boot_info);
+    interrupts::go_to_apic();
+
+    // Get ACPI tables
+    log::info!("Get ACPI tables");
+    acpi::init(boot_info);
 
     x86_64::instructions::interrupts::disable();
     log::info!("--- KERNEL FINISH ---");
