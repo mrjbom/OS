@@ -48,13 +48,13 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("Memory Manager initialization");
     memory_management::init(boot_info);
 
+    // Get ACPI tables
+    log::info!("Getting ACPI tables");
+    acpi::init(boot_info);
+
     // Init APIC
     log::info!("APIC interrupts initialization and enabling");
     interrupts::go_to_apic();
-
-    // Get ACPI tables
-    log::info!("Get ACPI tables");
-    acpi::init(boot_info);
 
     x86_64::instructions::interrupts::disable();
     log::info!("--- KERNEL FINISH ---");

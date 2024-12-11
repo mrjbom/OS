@@ -32,11 +32,11 @@ pub fn init(boot_info: &BootInfo) {
     ACPI_TABLES
         .lock()
         .set(acpi_tables)
-        .expect_err("ACPI_TABLES already sets");
+        .expect("ACPI_TABLES already sets");
 }
 
-#[derive(Clone)]
-struct BaseAcpiHandler;
+#[derive(Debug, Clone)]
+pub struct BaseAcpiHandler;
 
 impl acpi::AcpiHandler for BaseAcpiHandler {
     unsafe fn map_physical_region<T>(

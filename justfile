@@ -39,3 +39,7 @@ r: run-dev
 # Runs qemu for gdb debug
 rdbg: build-dev
 	qemu-system-x86_64 -drive file={{BOOTABLE_IMG_FILE_PATH}},format=raw {{RUN_DEV_QEMU_FLAGS}} -s -S
+
+# Runs qemu with -d int flag
+rdint: build-dev
+	qemu-system-x86_64 -drive file={{BOOTABLE_IMG_FILE_PATH}},format=raw {{RUN_DEV_QEMU_FLAGS}} -d int
