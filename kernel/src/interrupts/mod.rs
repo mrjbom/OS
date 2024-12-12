@@ -28,6 +28,9 @@ pub fn go_to_apic() {
     // Init local APIC
     apic::init();
 
+    // Init Local APIC Timer
+    apic::timer::init();
+
     // Enable interrupts
     x86_64::instructions::interrupts::enable();
 }

@@ -1,4 +1,5 @@
 use crate::interrupts::apic::{fill_lvt_timer_register, LocalApicVersion};
+use crate::interrupts::pit;
 
 /// Inits Local APIC Timer
 ///
@@ -20,33 +21,31 @@ pub fn init() {
         crate::interrupts::pic::PICS.write_masks(0b11111110, 0xFF)
     };
 
-    // "Set the local APIC timer's initial count"
-    //set_initial_count_register(9999999);
-
+    // Determine APIC Timer frequency without divider
     x86_64::instructions::interrupts::enable();
+    // Frequency without divider (= 1) in Hz (for 1 second)
+    let timer_true_frequency = determine_timer_true_frequency(16);
+
+    assert_ne!(
+        timer_true_frequency, 0,
+        "Failed to detect APIC frequency, bug"
+    );
+    x86_64::instructions::interrupts::disable();
 
     // https://wiki.osdev.org/APIC_Timer#Initializing
 }
 
 /// Sets frequency divider in Divide Configuration Register
 ///
-/// ## The Descrete APIC uses the bus frequency and is not affected by the local APIC frequency divider.
-///
 /// Valid values is 1, 2, 4, 8, 16, 32, 64, 128
 ///
 /// Wiki says "Bochs seems not to handle divide value of 1 properly"
-fn set_divide_configuration_register(frequency_divider: u16) {
-    if *super::LOCAL_APIC_VERSION.get().unwrap() == LocalApicVersion::Descrete {
-        // The discrete APIC uses the bus frequency, and it does not make sense to set a local APIC frequency divider.
-        panic!("Trying to set frequency divider for Descrete APIC");
-    }
+fn set_divide_configuration_register(frequency_divider: u8) {
     if !frequency_divider.is_power_of_two() || frequency_divider < 1 || frequency_divider > 128 {
         panic!("Trying to set invalid frequency divider");
     }
     if frequency_divider == 1 {
-        log::warn!(
-            "For APIC Timer wiki says \"Bochs seems not to handle divide value of 1 properly\""
-        );
+        panic!("For APIC Timer wiki says \"Bochs seems not to handle divide value of 1 properly\"");
     }
 
     // Devide Configuration Register value
@@ -66,11 +65,51 @@ fn set_divide_configuration_register(frequency_divider: u16) {
         super::DIVIDE_CONFIGURATION_REGISTER.write_volatile(register_value);
     }
 }
-/// Sets Initial Count register
+/// Sets Initial Count register and starts timer
 ///
 /// Write of 0 to the initial-count register effectively stops the local APIC timer, in both one-shot and periodic mode.
 pub fn set_initial_count_register(initial_count: u32) {
     unsafe {
         super::INITIAL_COUNT_REGISTER.write_volatile(initial_count);
     }
+}
+
+pub fn get_current_count_register_value() -> u32 {
+    unsafe { *super::CURRENT_COUNT_REGISTER }
+}
+
+/// Determines the frequency of the Local APIC Timer using PIT sleep<br>
+/// Calculates the true frequency as if there is no divisor (1)
+///
+/// current_frequency_divider may be any, the frequency will be recalculated taking it into account
+/// ```ignore
+/// ```
+// todo: Add determining using cpuid: it's a bit more complicated, but more accurate.
+fn determine_timer_true_frequency(current_frequency_divider: u8) -> u64 {
+    // Since there may be some inaccuracies using sleep(), I'll take some measurements and calculate the average value
+    let mut ticks_measures = [0u64; 5];
+    for v in ticks_measures.iter_mut() {
+        let initial_count = u32::MAX;
+
+        // Start APIC Timer
+        set_initial_count_register(initial_count);
+
+        // Sleep 10 ms
+        pit::sleep(10);
+
+        // Read current count register
+        let current_count = get_current_count_register_value();
+
+        // Ticks in 10 ms
+        *v = (initial_count - current_count) as u64;
+    }
+
+    // Disable APIC Timer
+    set_initial_count_register(0);
+
+    // Ticks in 10 ms
+    let average_ticks: u64 = ticks_measures.iter().sum::<u64>() / ticks_measures.len() as u64;
+
+    // Ticks in 1000 ms without divisor = true HZ
+    average_ticks / current_frequency_divider as u64 * 100
 }

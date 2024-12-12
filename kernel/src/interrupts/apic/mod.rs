@@ -1,4 +1,4 @@
-mod timer;
+pub(crate) mod timer;
 
 use crate::memory_management::virtual_memory_manager;
 use crate::memory_management::PAGE_SIZE;
@@ -124,9 +124,6 @@ pub fn init() {
     // APIC Timer must be enabled after configuration, this is done in its init code
     // https://wiki.osdev.org/APIC_Timer#Enabling_APIC_Timer
     //fill_lvt_timer_register();
-
-    // Init Local APIC Timer
-    timer::init();
 }
 
 /// Set and unmasks APIC Timer interrupt vector <br>

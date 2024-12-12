@@ -25,8 +25,6 @@ static MILLISECONDS_PER_TICK: AtomicU32 = AtomicU32::new(0);
 ///
 /// Interval of interrupt in ms (1-54)
 pub fn init(interval_in_milliseconds: u32) {
-    x86_64::instructions::interrupts::disable();
-
     // Max freq 1193182, with divisor 1, interval 0.00083 ms (1 without float pointer ops)
     // Min freq 18.2, with divisor 65535, interval 54.94 ms (54 without float pointer ops)
     assert!(
@@ -55,10 +53,10 @@ pub fn init(interval_in_milliseconds: u32) {
 
     // Set frequency rate
     unsafe {
-        x86_64::instructions::port::Port::new(REG_COUNTER0).write(divisor & 0xFF);
-        x86_64::instructions::port::Port::new(REG_COUNTER0).write((divisor >> 8) & 0xFF);
+        x86_64::instructions::port::Port::<u8>::new(REG_COUNTER0).write((divisor & 0xFF) as u8);
+        x86_64::instructions::port::Port::<u8>::new(REG_COUNTER0)
+            .write(((divisor >> 8) & 0xFF) as u8);
     }
-    x86_64::instructions::interrupts::enable();
 }
 
 #[inline]
