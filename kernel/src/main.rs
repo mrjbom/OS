@@ -32,15 +32,18 @@ bootloader_api::entry_point!(kmain, config = &BOOTLOADER_CONFIG);
 
 #[no_mangle]
 fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
+    // Init COM ports and logger
     com_ports::init();
     serial_debug::serial_logger::init();
+
+    // Kernel start
     log::info!("--- KERNEL START ---");
 
     // Init GDT
     log::info!("GDT initialization");
     gdt::init();
 
-    // Init and enable interrupts with PIC
+    // Init and enable interrupts (PIC)
     log::info!("PIC interrupts initialization and enabling");
     interrupts::init();
 
@@ -57,6 +60,8 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     interrupts::go_to_apic();
 
     x86_64::instructions::interrupts::disable();
+
+    // Kernel finish
     log::info!("--- KERNEL FINISH ---");
     loop {
         x86_64::instructions::hlt();

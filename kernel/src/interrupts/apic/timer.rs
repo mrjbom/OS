@@ -1,4 +1,3 @@
-use raw_cpuid::CpuId;
 use crate::interrupts::apic::{fill_lvt_timer_register, LocalApicVersion};
 
 /// Inits Local APIC Timer
@@ -16,16 +15,15 @@ pub fn init() {
     // The timer is started by writing to the Initial Count Register
     fill_lvt_timer_register();
     // "unmask the timer's IRQ"
-    //unsafe { crate::interrupts::pic::PICS.write_masks(0b11111110, 0xFF) };
+    #[allow(static_mut_refs)]
+    unsafe {
+        crate::interrupts::pic::PICS.write_masks(0b11111110, 0xFF)
+    };
 
     // "Set the local APIC timer's initial count"
-    log::debug!("APIC unmasked, start");
-    set_initial_count_register(9999999);
+    //set_initial_count_register(9999999);
 
     x86_64::instructions::interrupts::enable();
-    loop {
-
-    }
 
     // https://wiki.osdev.org/APIC_Timer#Initializing
 }
@@ -46,7 +44,9 @@ fn set_divide_configuration_register(frequency_divider: u16) {
         panic!("Trying to set invalid frequency divider");
     }
     if frequency_divider == 1 {
-        log::warn!("For APIC Timer wiki says \"Bochs seems not to handle divide value of 1 properly\"");
+        log::warn!(
+            "For APIC Timer wiki says \"Bochs seems not to handle divide value of 1 properly\""
+        );
     }
 
     // Devide Configuration Register value

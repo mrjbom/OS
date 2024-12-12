@@ -4,8 +4,9 @@ use x86_64::structures::idt::{ExceptionVector, InterruptStackFrame};
 pub mod apic;
 pub mod idt;
 pub mod pic;
+pub mod pit;
 
-/// Inits IDT, PIC and enable interrupts
+/// Inits IDT, PIC, PIT and enable interrupts
 ///
 /// APIC is not used. Switching to APIC is done using the go_to_apic() function.
 pub fn init() {
@@ -14,6 +15,9 @@ pub fn init() {
 
     // Remap and init PIC
     pic::init();
+
+    // Init and start PIT
+    pit::init(1);
 
     // Enable interrupts
     x86_64::instructions::interrupts::enable();
@@ -50,7 +54,6 @@ pub fn general_interrupt_handler(
     index: u8,
     error_code: Option<u64>,
 ) {
-    crate::serial_println_lock_free!("handler");
     match index {
         index if CPU_EXCEPTIONS_IDT_VECTORS_RANGE.contains(&index) => {
             // CPU Exception
@@ -78,8 +81,11 @@ pub fn general_interrupt_handler(
             }
         }
         index if PIC_IDT_VECTORS_RANGE.contains(&index) => {
-            crate::serial_println_lock_free!("PIC int {}", index - 32);
             // PIC interrupt
+            if index == 32 {
+                pit::handler();
+            }
+
             #[allow(static_mut_refs)]
             unsafe {
                 pic::PICS.notify_end_of_interrupt(index);

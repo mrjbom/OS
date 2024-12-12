@@ -25,21 +25,17 @@ const BASE_ADDR: PhysAddr = PhysAddr::new(0xFEE00000);
 /// Virtual address of local APIC base in Complete Physical Memory Mapping
 ///
 /// ## Must be mapped without caching
-const BASE_MAPPED_ADDR: VirtAddr =
-    virtual_memory_manager::phys_addr_to_cpmm_virt_addr(BASE_ADDR);
+const BASE_MAPPED_ADDR: VirtAddr = virtual_memory_manager::phys_addr_to_cpmm_virt_addr(BASE_ADDR);
 
 // Registers
 /// 0x30    Local APIC Version Register
-const VERSION_REGISTER: *mut u32 =
-     (BASE_MAPPED_ADDR.as_u64() + 0x30) as *mut u32;
+const VERSION_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0x30) as *mut u32;
 
 /// 0xB0    End Of Interrupt Register
-const EOI_REGISTER: *mut u32 =
-    (BASE_MAPPED_ADDR.as_u64() + 0xB0) as *mut u32;
+const EOI_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0xB0) as *mut u32;
 
 /// 0xF0	Spurious-Interrupt Vector Register
-const SPURIOUS_INTERRUPT_VECTOR_REGISTER: *mut u32 =
-    (BASE_MAPPED_ADDR.as_u64() + 0xF0) as *mut u32;
+const SPURIOUS_INTERRUPT_VECTOR_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0xF0) as *mut u32;
 
 /// 0x320   LVT Timer Register
 const LVT_TIMER_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0x320) as *mut u32;
@@ -212,6 +208,7 @@ fn fill_spurious_interrupt_vector_register() {
 }
 
 /// ## Don't use for Spurious Interrupt
+#[inline]
 pub fn send_eoi() {
     unsafe {
         EOI_REGISTER.write_volatile(0);
