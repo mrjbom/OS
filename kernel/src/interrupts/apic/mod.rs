@@ -1,5 +1,3 @@
-pub mod timer;
-
 use crate::memory_management::virtual_memory_manager;
 use crate::memory_management::PAGE_SIZE;
 use raw_cpuid::CpuId;
@@ -110,6 +108,9 @@ pub fn init() {
 
     // Disable PIC
     // # https://wiki.osdev.org/8259_PIC#Disabling
+    // We can't use PIC now, IO APIC required.
+    // On qemu and bochs interrupts from PIT to PIC on vector 32 after APIC activation were generated, but not on Virtual Box.
+    // The use of IO APIC is required.
     #[allow(static_mut_refs)]
     unsafe {
         super::pic::PICS.disable();

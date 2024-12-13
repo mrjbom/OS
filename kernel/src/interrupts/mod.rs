@@ -28,9 +28,6 @@ pub fn go_to_apic() {
     // Init local APIC
     apic::init();
 
-    // Init Local APIC Timer
-    apic::timer::init();
-
     // Enable interrupts
     x86_64::instructions::interrupts::enable();
 }
@@ -84,7 +81,7 @@ pub fn general_interrupt_handler(
             }
         }
         index if PIC_IDT_VECTORS_RANGE.contains(&index) => {
-            // PIC interrupt
+            // PIT interrupt
             if index == 32 {
                 pit::handler();
             }
@@ -95,7 +92,7 @@ pub fn general_interrupt_handler(
             };
         }
         LOCAL_APIC_TIMER_IDT_VECTOR => {
-            crate::serial_println_lock_free!("APIC TIMER interrupt");
+            //crate::serial_println_lock_free!("APIC TIMER interrupt");
             apic::send_eoi();
         }
         LOCAL_APIC_LINT0_IDT_VECTOR => {
@@ -103,7 +100,7 @@ pub fn general_interrupt_handler(
             apic::send_eoi();
         }
         LOCAL_APIC_LINT1_IDT_VECTOR => {
-            crate::serial_println_lock_free!("APIC LINT1 interrupt");
+            //crate::serial_println_lock_free!("APIC LINT1 interrupt");
             apic::send_eoi();
         }
         LOCAL_APIC_ERROR_IDT_VECTOR => {
