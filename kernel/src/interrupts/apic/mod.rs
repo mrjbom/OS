@@ -1,4 +1,4 @@
-pub(crate) mod timer;
+pub mod timer;
 
 use crate::memory_management::virtual_memory_manager;
 use crate::memory_management::PAGE_SIZE;

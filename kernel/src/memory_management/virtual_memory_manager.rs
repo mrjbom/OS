@@ -84,6 +84,10 @@ pub fn set_flags_in_page_table(
                 }
             }
         }
+        // todo: add 1GB page detection (may used by bootloader)
+        // https://github.com/rust-osdev/bootloader/issues/472
+        debug_assert!("Looks like bootloader has started using 1GB pages for memory mapping, need to take that into account");
+
         if current_level == page_table_level {
             unsafe {
                 let mut flags = (*page_table)[index].flags();

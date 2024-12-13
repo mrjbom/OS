@@ -1,7 +1,7 @@
 use crate::interrupts::apic::{fill_lvt_timer_register, LocalApicVersion};
 use crate::interrupts::pit;
 
-/// Inits Local APIC Timer
+/// Inits Local APIC Timer, uses PIT
 ///
 /// APIC interrupts must be enabled
 pub fn init() {
@@ -16,21 +16,29 @@ pub fn init() {
     // The timer is started by writing to the Initial Count Register
     fill_lvt_timer_register();
     // "unmask the timer's IRQ"
-    #[allow(static_mut_refs)]
     unsafe {
-        crate::interrupts::pic::PICS.write_masks(0b11111110, 0xFF)
+        // IRQ0 unmasked, others IRQ's masked
+        #[allow(static_mut_refs)]
+        crate::interrupts::pic::PICS.write_masks(0b11111110, 0b11111111)
     };
 
     // Determine APIC Timer frequency without divider
     x86_64::instructions::interrupts::enable();
     // Frequency without divider (= 1) in Hz (for 1 second)
+    // PIT used
     let timer_true_frequency = determine_timer_true_frequency(16);
+    log::debug!("Timer freq: {timer_true_frequency}");
+    // Disable PIC by masking all interrupts
+    x86_64::instructions::interrupts::disable();
+    unsafe {
+        #[allow(static_mut_refs)]
+        crate::interrupts::pic::PICS.disable();
+    }
 
     assert_ne!(
         timer_true_frequency, 0,
         "Failed to detect APIC frequency, bug"
     );
-    x86_64::instructions::interrupts::disable();
 
     // https://wiki.osdev.org/APIC_Timer#Initializing
 }
@@ -65,9 +73,10 @@ fn set_divide_configuration_register(frequency_divider: u8) {
         super::DIVIDE_CONFIGURATION_REGISTER.write_volatile(register_value);
     }
 }
-/// Sets Initial Count register and starts timer
+/// Sets Initial Count register and starts or stops timer
 ///
-/// Write of 0 to the initial-count register effectively stops the local APIC timer, in both one-shot and periodic mode.
+/// Write non 0 - starts
+/// Write 0 - stops
 pub fn set_initial_count_register(initial_count: u32) {
     unsafe {
         super::INITIAL_COUNT_REGISTER.write_volatile(initial_count);
@@ -82,13 +91,13 @@ pub fn get_current_count_register_value() -> u32 {
 /// Calculates the true frequency as if there is no divisor (1)
 ///
 /// current_frequency_divider may be any, the frequency will be recalculated taking it into account
-/// ```ignore
-/// ```
 // todo: Add determining using cpuid: it's a bit more complicated, but more accurate.
 fn determine_timer_true_frequency(current_frequency_divider: u8) -> u64 {
-    // Since there may be some inaccuracies using sleep(), I'll take some measurements and calculate the average value
-    let mut ticks_measures = [0u64; 5];
+    let mut ticks_measures = [0u64; 10];
     for v in ticks_measures.iter_mut() {
+        // Sleep betwen measures
+        pit::sleep(5);
+
         let initial_count = u32::MAX;
 
         // Start APIC Timer
@@ -111,5 +120,5 @@ fn determine_timer_true_frequency(current_frequency_divider: u8) -> u64 {
     let average_ticks: u64 = ticks_measures.iter().sum::<u64>() / ticks_measures.len() as u64;
 
     // Ticks in 1000 ms without divisor = true HZ
-    average_ticks / current_frequency_divider as u64 * 100
+    average_ticks * current_frequency_divider as u64 * 100
 }

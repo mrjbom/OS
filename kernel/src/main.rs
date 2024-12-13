@@ -47,6 +47,7 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("PIC interrupts initialization and enabling");
     interrupts::init();
 
+    /*
     {
         serial_println_lock_free!("START");
         serial_println_lock_free!("3");
@@ -61,6 +62,7 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
             serial_println_lock_free!("{i}");
         }
     }
+    */
 
     // Init memory manager
     log::info!("Memory Manager initialization");

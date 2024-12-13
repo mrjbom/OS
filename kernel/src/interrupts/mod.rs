@@ -99,7 +99,7 @@ pub fn general_interrupt_handler(
             apic::send_eoi();
         }
         LOCAL_APIC_LINT0_IDT_VECTOR => {
-            crate::serial_println_lock_free!("APIC LINT0 interrupt");
+            //crate::serial_println_lock_free!("APIC LINT0 interrupt");
             apic::send_eoi();
         }
         LOCAL_APIC_LINT1_IDT_VECTOR => {

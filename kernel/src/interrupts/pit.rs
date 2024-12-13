@@ -39,6 +39,7 @@ pub fn init(interval_in_milliseconds: u32) {
         "Invalid PIT frequency calculated, bug"
     );
     let divisor: u16 = (BASE_FREQ / freq) as u16;
+    // (godbolt tested) With Acquire just mov is used, with SeqCst xchg used, thats blocks the bus (like lock prefix).
     MILLISECONDS_PER_TICK.store(interval_in_milliseconds, Ordering::SeqCst);
     //log::debug!("freq: {freq}, divisor: {divisor}, MS_PER_TICK: {interval_in_milliseconds}");
 
@@ -61,18 +62,22 @@ pub fn init(interval_in_milliseconds: u32) {
 
 #[inline]
 pub fn handler() {
-    TICK_COUNTER.fetch_add(1, Ordering::SeqCst);
+    // I checked in godbolt and lock prefix is generated.
+    TICK_COUNTER.fetch_add(1, Ordering::AcqRel);
 }
 
 #[inline]
 pub fn get_ticks_counter() -> u64 {
-    TICK_COUNTER.load(Ordering::SeqCst)
+    // godbolt tested
+    // The lock prefix is not generated at any Ordering values (even if SeqCst is used), but it is not required, because we just read the data, everything is safe.
+    // Ordering is only required for the compiler, I think Acquire will suffice as there is nothing to reorder.
+    TICK_COUNTER.load(Ordering::Acquire)
 }
 
 /// Sleeps
 pub fn sleep(milliseconds: u32) {
-    let start_tick = TICK_COUNTER.load(Ordering::SeqCst);
-    let milliseconds_per_tick = MILLISECONDS_PER_TICK.load(Ordering::SeqCst);
+    let start_tick = TICK_COUNTER.load(Ordering::Acquire);
+    let milliseconds_per_tick = MILLISECONDS_PER_TICK.load(Ordering::Acquire);
     let end_tick = start_tick + ((milliseconds / milliseconds_per_tick) as u64);
     while get_ticks_counter() < end_tick {
         core::hint::spin_loop();
