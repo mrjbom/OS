@@ -44,7 +44,7 @@ pub enum MemoryZoneEnum {
 /// Specifies from which zones memory can be allocated and the priority in which it should be allocated
 ///
 /// Example:<br>
-/// [High, Dma32, IsaDma]:<br>
+/// [High, Dma32, IsaDma]:
 /// Attempts to allocate memory first from HIGH, then from DMA32 and then from ISA DMA<br>
 /// or<br>
 /// [Dma32, High]:
@@ -441,14 +441,13 @@ fn adjust_usable_region(
 
 /// Inits array of SlabInfo pointers
 fn init_slab_info_ptrs_array() {
-    assert!(USABLE_REGIONS.lock().is_sorted_by_key(|v| { v.first_page }));
-
     // Calculate required memory size for store SlabInfo's
     // SlabInfo per page from first usable to last usable
-    let last_usable_page_addr = USABLE_REGIONS.lock().last().unwrap().last_page.as_u64();
     let first_usable_page_addr = USABLE_REGIONS.lock().first().unwrap().first_page.as_u64();
+    let last_usable_page_addr = USABLE_REGIONS.lock().last().unwrap().last_page.as_u64();
     let number_of_slab_infos =
         (last_usable_page_addr + PAGE_SIZE as u64 - first_usable_page_addr) as usize / PAGE_SIZE;
+
     let mut required_memory_size = number_of_slab_infos * size_of::<*mut SlabInfo>();
     required_memory_size = x86_64::align_up(required_memory_size as u64, PAGE_SIZE as u64) as usize;
     assert_eq!(required_memory_size % PAGE_SIZE, 0);
@@ -456,6 +455,7 @@ fn init_slab_info_ptrs_array() {
     // Reserve required memory in usable region
     // Physical address of the array
     let mut required_memory_phys_addr: PhysAddr = PhysAddr::zero();
+    assert!(USABLE_REGIONS.lock().is_sorted_by_key(|v| { v.first_page }));
     for usable_region in USABLE_REGIONS.lock().iter_mut().rev() {
         if usable_region.size() >= required_memory_size + PAGE_SIZE {
             // Use this region
