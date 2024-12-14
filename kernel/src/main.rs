@@ -55,8 +55,8 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("Getting ACPI tables");
     acpi::init(boot_info);
 
-    // Init APIC
-    log::info!("APIC interrupts initialization and enabling");
+    // Init APIC, IO APIC and enable interrupts
+    log::info!("APIC and IO APIC initialization");
     interrupts::go_to_apic();
 
     x86_64::instructions::interrupts::disable();

@@ -24,6 +24,7 @@ pub fn init(boot_info: &BootInfo) {
         (*rsdp).validate().expect("Invalid RSDP!");
     }
 
+    // Create ACPI tables
     let acpi_tables = unsafe {
         AcpiTables::from_rsdp(BaseAcpiHandler, rsdp_phys_addr as usize)
             .expect("Failed to get ACPI tables")
@@ -32,7 +33,7 @@ pub fn init(boot_info: &BootInfo) {
     ACPI_TABLES
         .lock()
         .set(acpi_tables)
-        .expect("ACPI_TABLES already sets");
+        .expect("ACPI_TABLES already set");
 }
 
 #[derive(Debug, Clone)]

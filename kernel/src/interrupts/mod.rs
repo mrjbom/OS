@@ -23,9 +23,9 @@ pub fn init() {
     x86_64::instructions::interrupts::enable();
 }
 
-/// Disables PIC and inits local APIC, enables interrupts
+/// Disables PIC and inits local APIC, IO APIC, enables interrupts
 pub fn go_to_apic() {
-    // Init local APIC
+    // Init local APIC and IO APIC
     apic::init();
 
     // Enable interrupts

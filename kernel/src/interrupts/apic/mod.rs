@@ -1,3 +1,5 @@
+mod ioapic;
+
 use crate::memory_management::virtual_memory_manager;
 use crate::memory_management::PAGE_SIZE;
 use raw_cpuid::CpuId;
@@ -67,7 +69,7 @@ pub fn init() {
         panic!("APIC not supported");
     }
 
-    // Check APIC base address from MSR
+    // Check APIC base address from MSR (Intel and AMD supported)
     let ia32_apic_base_msr = unsafe { x86_64::registers::model_specific::Msr::new(0x1B).read() };
     let apic_base_page_phys_addr_from_msr =
         x86_64::align_down(ia32_apic_base_msr, PAGE_SIZE as u64);
@@ -125,6 +127,9 @@ pub fn init() {
     // APIC Timer must be enabled after configuration, this is done in its init code
     // https://wiki.osdev.org/APIC_Timer#Enabling_APIC_Timer
     //fill_lvt_timer_register();
+
+    // Init IO APIC
+    ioapic::init();
 }
 
 /// Set and unmasks APIC Timer interrupt vector <br>
