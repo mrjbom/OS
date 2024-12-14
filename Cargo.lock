@@ -742,7 +742,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -1186,7 +1186,7 @@ dependencies = [
 [[package]]
 name = "slab_allocator"
 version = "0.1.0"
-source = "git+https://github.com/mrjbom/slab_allocator.git#07d47792648541339e72b56be9d58e17036620cd"
+source = "git+https://github.com/mrjbom/slab_allocator.git#4deb657f58bd2c34dcd461b3ac2d64a7f73754b5"
 dependencies = [
  "intrusive-collections",
 ]
