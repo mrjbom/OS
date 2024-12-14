@@ -2,7 +2,7 @@ pub mod physical_memory_manager;
 pub mod virtual_memory_manager;
 
 /// 4KB
-const PAGE_SIZE: usize = 4096;
+pub const PAGE_SIZE: usize = 4096;
 
 /// Inits Physical Memory Manager and Virtual Memory Manager
 pub fn init(boot_info: &bootloader_api::BootInfo) {

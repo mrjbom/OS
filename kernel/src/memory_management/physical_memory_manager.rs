@@ -2,7 +2,6 @@ use super::{virtual_memory_manager, PAGE_SIZE};
 use bootloader_api::info::{MemoryRegion, MemoryRegionKind};
 use buddy_alloc::BuddyAlloc;
 use core::mem::MaybeUninit;
-use core::ops::Deref;
 use core::ptr::null_mut;
 use lazy_static::lazy_static;
 use slab_allocator::SlabInfo;
@@ -184,7 +183,7 @@ lazy_static! {
 
 /// Inits Physical Memory Manager and allocators
 pub fn init(boot_info: &bootloader_api::BootInfo) {
-    collect_usable_regions(boot_info.memory_regions.deref());
+    collect_usable_regions(&*boot_info.memory_regions);
     init_slab_info_ptrs_array();
     init_allocators();
 
@@ -453,9 +452,7 @@ fn init_slab_info_ptrs_array() {
     let number_of_slab_infos =
         (last_usable_page_addr + PAGE_SIZE as u64 - first_usable_page_addr) as usize / PAGE_SIZE;
     let mut required_memory_size = number_of_slab_infos * size_of::<*mut SlabInfo>();
-    if required_memory_size % PAGE_SIZE != 0 {
-        required_memory_size += PAGE_SIZE - (required_memory_size % PAGE_SIZE);
-    }
+    required_memory_size = x86_64::align_up(required_memory_size as u64, PAGE_SIZE as u64) as usize;
     assert_eq!(required_memory_size % PAGE_SIZE, 0);
 
     // Reserve required memory in usable region
@@ -656,9 +653,7 @@ fn init_allocators() {
             // 2
             let mut metadata_size = BuddyAlloc::sizeof_alignment(range_size, PAGE_SIZE)
                 .expect("Failed to calculate metadata size for HIGH allocator!");
-            if metadata_size % PAGE_SIZE != 0 {
-                metadata_size += PAGE_SIZE - (metadata_size % PAGE_SIZE);
-            }
+            metadata_size = x86_64::align_up(metadata_size as u64, PAGE_SIZE as u64) as usize;
             assert_eq!(metadata_size % PAGE_SIZE, 0);
 
             // 3
