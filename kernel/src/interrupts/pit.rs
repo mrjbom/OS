@@ -28,7 +28,7 @@ pub fn init(interval_in_milliseconds: u32) {
     // Max freq 1193182, with divisor 1, interval 0.00083 ms (1 without float pointer ops)
     // Min freq 18.2, with divisor 65535, interval 54.94 ms (54 without float pointer ops)
     assert!(
-        interval_in_milliseconds >= 1 && interval_in_milliseconds <= 54,
+        (1..=54).contains(&interval_in_milliseconds),
         "Invalid PIC interval"
     );
 

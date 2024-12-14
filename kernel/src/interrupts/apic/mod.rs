@@ -34,7 +34,7 @@ const VERSION_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0x30) as *mut u3
 /// 0xB0    End Of Interrupt Register
 const EOI_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0xB0) as *mut u32;
 
-/// 0xF0	Spurious-Interrupt Vector Register
+/// 0xF0    Spurious-Interrupt Vector Register
 const SPURIOUS_INTERRUPT_VECTOR_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0xF0) as *mut u32;
 
 /// 0x320   LVT Timer Register

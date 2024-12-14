@@ -183,7 +183,7 @@ lazy_static! {
 
 /// Inits Physical Memory Manager and allocators
 pub fn init(boot_info: &bootloader_api::BootInfo) {
-    collect_usable_regions(&*boot_info.memory_regions);
+    collect_usable_regions(&boot_info.memory_regions);
     init_slab_info_ptrs_array();
     init_allocators();
 
@@ -247,29 +247,27 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
             + HIGH_USABLE_REGIONS.lock().len()
     );
 
+    // Checks if the region is in more than in one zone at the same time.
     for some_region in USABLE_REGIONS.lock().iter() {
         let mut was_found_n_times = 0;
         if ISA_DMA_USABLE_REGIONS
             .lock()
             .iter()
-            .find(|dma_region| some_region == *dma_region)
-            .is_some()
+            .any(|dma_region| some_region == dma_region)
         {
             was_found_n_times += 1;
         }
         if DMA32_USABLE_REGIONS
             .lock()
             .iter()
-            .find(|dma32_region| some_region == *dma32_region)
-            .is_some()
+            .any(|dma32_region| some_region == dma32_region)
         {
             was_found_n_times += 1;
         }
         if HIGH_USABLE_REGIONS
             .lock()
             .iter()
-            .find(|high_region| some_region == *high_region)
-            .is_some()
+            .any(|high_region| some_region == high_region)
         {
             was_found_n_times += 1;
         }

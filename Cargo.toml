@@ -4,4 +4,3 @@ resolver = "2"
 
 [profile.dev]
 debug = "full"
-opt-level = 0
