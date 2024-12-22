@@ -1,6 +1,7 @@
 pub mod physical_memory_manager;
 mod slab_allocator;
 pub mod virtual_memory_manager;
+mod dlmalloc_allocator;
 
 /// 4KB
 pub const PAGE_SIZE: usize = 4096;
