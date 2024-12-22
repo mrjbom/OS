@@ -1,6 +1,6 @@
-use core::alloc::{AllocError, Layout};
 use crate::memory_management::physical_memory_manager::MemoryZoneEnum;
 use crate::memory_management::PAGE_SIZE;
+use core::alloc::{AllocError, Layout};
 use core::mem::MaybeUninit;
 use core::ptr::{null_mut, NonNull};
 use slab_allocator_lib::{Cache, MemoryBackend, ObjectSizeType, SlabInfo};
@@ -48,8 +48,8 @@ impl MemoryBackend for DefaultMemoryBackend {
         let phys_addr = super::physical_memory_manager::alloc(
             &[
                 MemoryZoneEnum::High,
-                MemoryZoneEnum::IsaDma,
                 MemoryZoneEnum::Dma32,
+                MemoryZoneEnum::IsaDma,
             ],
             slab_size,
         );
@@ -147,8 +147,8 @@ impl MemoryBackend for SlabInfoCacheMemoryBackend {
         let phys_addr = super::physical_memory_manager::alloc(
             &[
                 MemoryZoneEnum::High,
-                MemoryZoneEnum::IsaDma,
                 MemoryZoneEnum::Dma32,
+                MemoryZoneEnum::IsaDma,
             ],
             slab_size,
         );

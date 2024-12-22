@@ -25,8 +25,11 @@ struct MemoryZone {
 
 #[derive(Debug, Copy, Clone)]
 pub enum MemoryZoneEnum {
+    /// (1-16 MB)
     IsaDma,
+    /// (16 MB - 4 GB)
     Dma32,
+    /// (4 GB - 1 TB)
     High,
 }
 
@@ -727,7 +730,7 @@ fn init_allocators() {
 
 /// Allocs memory from zone using buddy allocators
 ///
-/// requested_size must be power of two
+/// request_size must be one or more pages
 ///
 /// MemoryZonesAndPrioritySpecifier specifies from which zones memory can be allocated and the priority in which it should be allocated
 ///
@@ -740,12 +743,10 @@ pub unsafe fn alloc(
     memory_zones_and_priority_specifier: &MemoryZonesAndPrioritySpecifier,
     requested_size: usize,
 ) -> PhysAddr {
-    debug_assert_ne!(requested_size, 0, "Trying to alloc zero sized block");
     debug_assert!(
-        requested_size.is_power_of_two(),
-        "requested_size is non power of two"
+        requested_size >= PAGE_SIZE && requested_size.is_power_of_two(),
+        "Requested size must be one or more pages"
     );
-    debug_assert_eq!(requested_size % PAGE_SIZE, 0, "");
 
     for requested_memory_zone_specifier in memory_zones_and_priority_specifier.iter() {
         let requested_memory_zone = match requested_memory_zone_specifier {
@@ -788,22 +789,7 @@ pub unsafe fn free(freed_addr: PhysAddr) {
         "Trying to free non aligned address"
     );
 
-    let memory_zone = {
-        if freed_addr >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR
-            && freed_addr <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR
-        {
-            &ISA_DMA_ZONE
-        } else if freed_addr >= DMA32_MIN_FIRST_PAGE_ADDR && freed_addr <= DMA32_MAX_LAST_PAGE_ADDR
-        {
-            &DMA32_ZONE
-        } else if freed_addr >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR
-            && freed_addr <= HIGH_ZONE_MAX_LAST_PAGE_ADDR
-        {
-            &HIGH_ZONE
-        } else {
-            unreachable!("Trying to free invalid address");
-        }
-    };
+    let memory_zone = get_zone_allocator_by_addr(freed_addr);
 
     unsafe {
         memory_zone
@@ -812,5 +798,35 @@ pub unsafe fn free(freed_addr: PhysAddr) {
             .lock()
             .allocator
             .free(freed_addr.as_u64() as *mut u8);
+    }
+}
+
+/// Reallocs memory, like C realloc
+pub unsafe fn realloc(phys_addr: PhysAddr, requested_size: usize, ignore_data: bool) -> *mut u8 {
+    if !ignore_data {
+        unimplemented!("unimplemented: Since the buddy allocator works with physical memory, it will not be able to move data");
+    }
+    let memory_zone = get_zone_allocator_by_addr(phys_addr);
+
+    memory_zone
+        .get()
+        .expect("Trying to free memory from non-existing zone")
+        .lock()
+        .allocator
+        .realloc(phys_addr.as_u64() as *mut u8, requested_size, ignore_data)
+}
+
+fn get_zone_allocator_by_addr(phys_addr: PhysAddr) -> &'static Once<Mutex<MemoryZone>> {
+    if phys_addr >= ISA_DMA_ZONE_MIN_FIRST_PAGE_ADDR && phys_addr <= ISA_DMA_ZONE_MAX_LAST_PAGE_ADDR
+    {
+        &ISA_DMA_ZONE
+    } else if phys_addr >= DMA32_MIN_FIRST_PAGE_ADDR && phys_addr <= DMA32_MAX_LAST_PAGE_ADDR {
+        &DMA32_ZONE
+    } else if phys_addr >= HIGH_ZONE_MIN_FIRST_PAGE_ADDR
+        && phys_addr <= HIGH_ZONE_MAX_LAST_PAGE_ADDR
+    {
+        &HIGH_ZONE
+    } else {
+        unreachable!("Trying to free invalid address");
     }
 }

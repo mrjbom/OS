@@ -2,7 +2,6 @@
 #![feature(allocator_api)]
 #![no_std]
 #![no_main]
-
 #![allow(unused, dead_code)]
 
 use bootloader_api::config::Mapping;
