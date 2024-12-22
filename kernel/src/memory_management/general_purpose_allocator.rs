@@ -5,7 +5,20 @@ use core::ptr::{null_mut, NonNull};
 use spin::{Mutex, Once};
 use x86_64::{PhysAddr, VirtAddr};
 
-/// "System" allocator required for Dlmalloc allocator
+static DLMALLOC_ALLOCATOR: Once<Mutex<dlmalloc::Dlmalloc<DlmallocSystemAllocator>>> = Once::new();
+
+/// Inits general purpose allocator (dlmalloc)
+pub fn init() {
+    unsafe {
+        DLMALLOC_ALLOCATOR.call_once(|| {
+            Mutex::new(dlmalloc::Dlmalloc::new_with_allocator(
+                DlmallocSystemAllocator,
+            ))
+        });
+    }
+}
+
+/// "System" allocator required for dlmalloc allocator
 ///
 /// Wrapper over buddy allocator
 struct DlmallocSystemAllocator;
@@ -36,7 +49,7 @@ unsafe impl dlmalloc::Allocator for DlmallocSystemAllocator {
     }
 
     fn remap(&self, ptr: *mut u8, oldsize: usize, newsize: usize, can_move: bool) -> *mut u8 {
-        debug_assert!(!ptr.is_null(), "dmalloc tries to remap null ptr");
+        debug_assert!(!ptr.is_null(), "dlmalloc tries to remap null ptr");
         if !(oldsize >= PAGE_SIZE && oldsize.is_power_of_two()) {
             unimplemented!("dlmalloc tries to remap a memory with oldsize not suitable for buddy allocator: {oldsize}");
         }
@@ -69,7 +82,7 @@ unsafe impl dlmalloc::Allocator for DlmallocSystemAllocator {
     }
 
     fn free(&self, ptr: *mut u8, size: usize) -> bool {
-        debug_assert!(!ptr.is_null(), "dmalloc tries to free null ptr");
+        debug_assert!(!ptr.is_null(), "dlmalloc tries to free null ptr");
         if !(size >= PAGE_SIZE && size.is_power_of_two()) {
             unimplemented!("dlmalloc tries to free a memory with size not suitable for buddy allocator: {size}");
         }

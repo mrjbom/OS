@@ -16,4 +16,7 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
 
     log::info!("SLAB allocator initialization");
     slab_allocator::init();
+
+    log::info!("General purpose allocator initialization");
+    general_purpose_allocator::init();
 }
