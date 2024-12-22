@@ -1,3 +1,4 @@
+use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
 use acpi_lib::madt::{Madt, MadtEntry};
 use acpi_lib::AcpiTable;
 
@@ -16,4 +17,9 @@ pub fn init() {
             log::debug!("IO APIC entry detected: {io_apic_entry:?}");
         }
     }
+
+    let platform_info = acpi_tables_mutex_guard
+        .platform_info_in(GeneralPurposeAllocator)
+        .expect("Failed to get platfor info from ACPI tables");
+    log::debug!("Platform info: {platform_info:#?}");
 }

@@ -112,12 +112,18 @@ unsafe impl dlmalloc::Allocator for DlmallocSystemAllocator {
 /// A SLAB allocator should be used for frequent and basic selection of kernel objects of the same size.
 ///
 /// Uses dlmalloc.
+#[derive(Copy, Clone, Debug)]
 pub struct GeneralPurposeAllocator;
 
 unsafe impl core::alloc::Allocator for GeneralPurposeAllocator {
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-        if layout.size() == 0 || layout.align() == 0 {
-            panic!("Invalid layout requested, maybe bug");
+        if layout.align() == 0 {
+            panic!("Invalid align requested, maybe bug: {layout:?}");
+        }
+        if layout.size() == 0 {
+            // Create aligned danglign pointer
+            let ptr = layout.align() as *mut u8;
+            return Ok(NonNull::slice_from_raw_parts(NonNull::new(ptr).unwrap(), 0));
         }
         let allocated_ptr = unsafe {
             DLMALLOC_ALLOCATOR
@@ -138,8 +144,11 @@ unsafe impl core::alloc::Allocator for GeneralPurposeAllocator {
     }
 
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        if !ptr.is_aligned() || layout.size() == 0 || layout.align() == 0 {
+        if !ptr.is_aligned() || layout.align() == 0 {
             panic!("Invalid deallocate parameters");
+        }
+        if layout.size() == 0 {
+            return;
         }
 
         unsafe {
