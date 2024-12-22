@@ -269,7 +269,7 @@ checksum = "57a08a674787a3711ea0ba3bd730e6ffeb74832dcf6c51caf553528b33b54f73"
 [[package]]
 name = "buddy_alloc"
 version = "1.2.0"
-source = "git+https://github.com/mrjbom/buddy_alloc_rs.git#8d6ca97ff54db2d4b4cd290e21e41caf0b42c118"
+source = "git+https://github.com/mrjbom/buddy_alloc_rs.git#c9a5018e9ec30ad73a9b7a80a974925e124a05e3"
 dependencies = [
  "buddy_alloc_sys",
 ]
@@ -277,7 +277,7 @@ dependencies = [
 [[package]]
 name = "buddy_alloc_sys"
 version = "1.2.0"
-source = "git+https://github.com/mrjbom/buddy_alloc_rs.git#8d6ca97ff54db2d4b4cd290e21e41caf0b42c118"
+source = "git+https://github.com/mrjbom/buddy_alloc_rs.git#c9a5018e9ec30ad73a9b7a80a974925e124a05e3"
 dependencies = [
  "bindgen",
  "cc",
@@ -291,9 +291,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "cc"
-version = "1.2.4"
+version = "1.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9157bbaa6b165880c27a4293a474c91cdcf265cc68cc829bf10be0964a391caf"
+checksum = "c31a0499c1dc64f458ad13872de75c0eb7e3fdb0e67964610c914b034fc5956e"
 dependencies = [
  "shlex",
 ]
@@ -360,9 +360,9 @@ checksum = "19d374276b40fb8bbdee95aef7c7fa6b5316ec764510eb64b8dd0e2ed0d7e7f5"
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.20"
+version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22ec99545bb0ed0ea7bb9b8e1e9122ea386ff8a48c0922e43f36d45ab09e0e80"
+checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "diatomic-waker"
@@ -716,7 +716,6 @@ dependencies = [
  "spin",
  "tinyvec",
  "uart_16550",
- "volatile 0.6.1",
  "x86_64",
 ]
 
@@ -731,9 +730,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.168"
+version = "0.2.169"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aaeb2981e0606ca11d79718f8bb01164f1d6ed75080182d3abf017e6d244b6d"
+checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
 
 [[package]]
 name = "libloading"
@@ -1140,9 +1139,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.133"
+version = "1.0.134"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7fceb2473b9166b2294ef05efcb65a3db80803f0b03ef86a5fc88a2b85ee377"
+checksum = "d00f4175c42ee48b15416f6193a959ba3a0d67fc699a0db9ad12df9f83991c7d"
 dependencies = [
  "itoa",
  "memchr",
@@ -1186,9 +1185,10 @@ dependencies = [
 [[package]]
 name = "slab_allocator"
 version = "0.1.0"
-source = "git+https://github.com/mrjbom/slab_allocator.git#4deb657f58bd2c34dcd461b3ac2d64a7f73754b5"
+source = "git+https://github.com/mrjbom/slab_allocator.git#5bc506cf6c518df9127661b085f388afad5fa7e8"
 dependencies = [
  "intrusive-collections",
+ "spin",
 ]
 
 [[package]]
@@ -1218,9 +1218,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.90"
+version = "2.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "919d3b74a5dd0ccd15aeb8f93e7006bd9e14c295087c9896a110f490752bcf31"
+checksum = "d53cbcb5a243bd33b7858b1d7f4aca2153490815872d86d955d6ea29f743c035"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1278,9 +1278,9 @@ dependencies = [
 
 [[package]]
 name = "tinyvec"
-version = "1.8.0"
+version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "445e881f4f6d382d5f27c034e25eb92edd7c784ceab92a0937db7f2e9471b938"
+checksum = "022db8904dfa342efe721985167e9fcd16c29b226db4397ed752a761cfce81e8"
 
 [[package]]
 name = "tracing"
@@ -1380,12 +1380,6 @@ name = "volatile"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "442887c63f2c839b346c192d047a7c87e73d0689c9157b00b53dcc27dd5ea793"
-
-[[package]]
-name = "volatile"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af8ca9a5d4debca0633e697c88269395493cebf2e10db21ca2dbde37c1356452"
 
 [[package]]
 name = "waker-fn"
@@ -1598,5 +1592,5 @@ dependencies = [
  "bit_field",
  "bitflags 2.6.0",
  "rustversion",
- "volatile 0.4.6",
+ "volatile",
 ]

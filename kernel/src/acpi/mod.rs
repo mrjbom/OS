@@ -1,13 +1,12 @@
 use crate::memory_management::virtual_memory_manager::PHYSICAL_MEMORY_MAPPING_OFFSET;
 use crate::memory_management::PAGE_SIZE;
-use acpi::{AcpiTables, PhysicalMapping};
+use acpi_lib::{AcpiTables, PhysicalMapping};
 use bootloader_api::BootInfo;
-use core::cell::OnceCell;
 use core::ptr::NonNull;
-use spin::Mutex;
+use spin::{Mutex, Once};
 use x86_64::VirtAddr;
 
-pub static ACPI_TABLES: Mutex<OnceCell<AcpiTables<BaseAcpiHandler>>> = Mutex::new(OnceCell::new());
+pub static ACPI_TABLES: Once<Mutex<AcpiTables<BaseAcpiHandler>>> = Once::new();
 
 /// Gets ACPI tables
 pub fn init(boot_info: &BootInfo) {
@@ -18,8 +17,8 @@ pub fn init(boot_info: &BootInfo) {
         .expect("Bootloader could not find RSDP");
 
     // Validate RSDP
-    let rsdp =
-        VirtAddr::new(rsdp_phys_addr + PHYSICAL_MEMORY_MAPPING_OFFSET).as_ptr::<acpi::rsdp::Rsdp>();
+    let rsdp = VirtAddr::new(rsdp_phys_addr + PHYSICAL_MEMORY_MAPPING_OFFSET)
+        .as_ptr::<acpi_lib::rsdp::Rsdp>();
     unsafe {
         (*rsdp).validate().expect("Invalid RSDP!");
     }
@@ -30,16 +29,13 @@ pub fn init(boot_info: &BootInfo) {
             .expect("Failed to get ACPI tables")
     };
 
-    ACPI_TABLES
-        .lock()
-        .set(acpi_tables)
-        .expect("ACPI_TABLES already set");
+    ACPI_TABLES.call_once(|| Mutex::new(acpi_tables));
 }
 
 #[derive(Debug, Clone)]
 pub struct BaseAcpiHandler;
 
-impl acpi::AcpiHandler for BaseAcpiHandler {
+impl acpi_lib::AcpiHandler for BaseAcpiHandler {
     unsafe fn map_physical_region<T>(
         &self,
         physical_address: usize,

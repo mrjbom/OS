@@ -4,21 +4,10 @@ use buddy_alloc::BuddyAlloc;
 use core::mem::MaybeUninit;
 use core::ptr::null_mut;
 use lazy_static::lazy_static;
-use slab_allocator::SlabInfo;
+use slab_allocator_lib::SlabInfo;
 use spin::{Mutex, Once};
 use tinyvec::ArrayVec;
 use x86_64::PhysAddr;
-
-/// Array of saved SlabInfo's pointers for each page. Used by Slab Allocator's
-///
-/// Mutex is not required because a properly working SlabAllocator and his MemoryBackend will not touch data that is not its own
-// TODO: Instead of this approach, you can use a hash table.
-// But the hash table approach has the disadvantage that
-// it requires expanding the hash table (doubling its size), and it doesn't fit well with SlabAllocator (you'll have to create a many of caches of double size)
-// This array approach wastes memory. Thus, we have to store 262144 pointers(2097152 bytes, 2MB) for 1 GB of memory
-//
-// MaybeUninit is used because initializing the entire array memory before creating a slice is a heavy operation
-static mut SLAB_INFO_PTRS: Once<&'static mut [MaybeUninit<*mut SlabInfo>]> = Once::new();
 
 /// Some zone in memory:
 ///
@@ -516,7 +505,7 @@ fn init_slab_info_ptrs_array() {
 
     #[allow(static_mut_refs)]
     unsafe {
-        SLAB_INFO_PTRS.call_once(|| slice);
+        super::slab_allocator::SLAB_INFO_PTRS.call_once(|| slice);
     }
 }
 
@@ -756,6 +745,7 @@ pub unsafe fn alloc(
         requested_size.is_power_of_two(),
         "requested_size is non power of two"
     );
+    debug_assert_eq!(requested_size % PAGE_SIZE, 0, "");
 
     for requested_memory_zone_specifier in memory_zones_and_priority_specifier.iter() {
         let requested_memory_zone = match requested_memory_zone_specifier {

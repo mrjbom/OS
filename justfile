@@ -5,7 +5,7 @@ BOOTABLE_IMG_FILE_PATH := "bootable.img"
 
 # QEMU monitor and stdio in terminal
 # Press Ctrl-A then C to switch between serial and monitor
-RUN_DEV_QEMU_FLAGS := "-serial mon:stdio -display none -m 5128"
+RUN_DEV_QEMU_FLAGS := "-serial mon:stdio -display none"
 
 list:
 	@just --list

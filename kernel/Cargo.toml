@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 bootloader_api = "0.11.7"
 x86_64 = "0.15.1"
-volatile = "0.6.1"
 spin = "0.9.8"
 uart_16550 = "0.3.1"
 lazy_static = { version = "1.5.0", features = ["spin_no_std"] }
@@ -14,8 +13,8 @@ log = "0.4.22"
 pic8259 = "0.11.0"
 tinyvec = "1.8.0"
 raw-cpuid = "11.2.0"
-acpi = { version = "5.1.0", default-features = false }
+acpi_lib = { package = "acpi", version = "5.1.0", default-features = false }
 
 # My
 buddy_alloc = { git = "https://github.com/mrjbom/buddy_alloc_rs.git" }
-slab_allocator = { git = "https://github.com/mrjbom/slab_allocator.git" }
+slab_allocator_lib = { package = "slab_allocator", git = "https://github.com/mrjbom/slab_allocator.git" }
