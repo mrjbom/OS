@@ -1,6 +1,6 @@
-mod general_purpose_allocator;
+pub mod general_purpose_allocator;
 pub mod physical_memory_manager;
-mod slab_allocator;
+pub mod slab_allocator;
 pub mod virtual_memory_manager;
 
 /// 4KB

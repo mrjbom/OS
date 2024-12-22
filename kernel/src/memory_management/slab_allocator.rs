@@ -1,8 +1,7 @@
 use crate::memory_management::physical_memory_manager::MemoryZoneEnum;
 use crate::memory_management::PAGE_SIZE;
-use core::alloc::{AllocError, Layout};
 use core::mem::MaybeUninit;
-use core::ptr::{null_mut, NonNull};
+use core::ptr::null_mut;
 use slab_allocator_lib::{Cache, MemoryBackend, ObjectSizeType, SlabInfo};
 use spin::{Mutex, Once};
 use x86_64::VirtAddr;
@@ -36,6 +35,7 @@ pub fn init() {
     });
 }
 
+/// MemoryBackend suitable for any cache
 struct DefaultMemoryBackend;
 
 impl MemoryBackend for DefaultMemoryBackend {

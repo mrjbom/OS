@@ -1,6 +1,6 @@
 use crate::memory_management::physical_memory_manager::MemoryZoneEnum;
 use crate::memory_management::PAGE_SIZE;
-use core::alloc::{AllocError, Allocator, Layout};
+use core::alloc::{AllocError, Layout};
 use core::ptr::{null_mut, NonNull};
 use spin::{Mutex, Once};
 use x86_64::{PhysAddr, VirtAddr};
@@ -9,13 +9,11 @@ static DLMALLOC_ALLOCATOR: Once<Mutex<dlmalloc::Dlmalloc<DlmallocSystemAllocator
 
 /// Inits general purpose allocator (dlmalloc)
 pub fn init() {
-    unsafe {
-        DLMALLOC_ALLOCATOR.call_once(|| {
-            Mutex::new(dlmalloc::Dlmalloc::new_with_allocator(
-                DlmallocSystemAllocator,
-            ))
-        });
-    }
+    DLMALLOC_ALLOCATOR.call_once(|| {
+        Mutex::new(dlmalloc::Dlmalloc::new_with_allocator(
+            DlmallocSystemAllocator,
+        ))
+    });
 }
 
 /// "System" allocator required for dlmalloc allocator
@@ -77,7 +75,7 @@ unsafe impl dlmalloc::Allocator for DlmallocSystemAllocator {
         }
     }
 
-    fn free_part(&self, ptr: *mut u8, oldsize: usize, newsize: usize) -> bool {
+    fn free_part(&self, _ptr: *mut u8, _oldsize: usize, _newsize: usize) -> bool {
         unreachable!("dlmalloc should not call this function");
     }
 
