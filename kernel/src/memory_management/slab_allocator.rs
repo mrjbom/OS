@@ -1,7 +1,8 @@
+use core::alloc::{AllocError, Layout};
 use crate::memory_management::physical_memory_manager::MemoryZoneEnum;
 use crate::memory_management::PAGE_SIZE;
 use core::mem::MaybeUninit;
-use core::ptr::null_mut;
+use core::ptr::{null_mut, NonNull};
 use slab_allocator_lib::{Cache, MemoryBackend, ObjectSizeType, SlabInfo};
 use spin::{Mutex, Once};
 use x86_64::VirtAddr;
@@ -93,7 +94,7 @@ define_static_generic_cache!(
 
 /// Inits generic cache defined by define_static_generic_cache!() macro
 ///
-/// init_static_generic_cache!(GENERIC_CACHE16, 4096, ObjectSizeType::Small, DefaultMemoryBackend);
+/// `init_static_generic_cache!(GENERIC_CACHE16, 4096, ObjectSizeType::Small, DefaultMemoryBackend);`
 macro_rules! init_static_generic_cache {
     ($cache_name:ident, $slab_size:expr, $object_size_type:path, $memory_backend_type:ident) => {
         $cache_name.call_once(|| {
@@ -117,6 +118,22 @@ macro_rules! init_static_generic_cache {
 /// Separate caches should be used for kernel objects that are allocated a lot and frequently.
 struct GenericAllocator;
 
+unsafe impl core::alloc::Allocator for GenericAllocator {
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        assert_ne!(layout.align(), 0, "Zero align requested");
+        if layout.size() < 16 {
+            panic!("Can't allocate size < 16");
+        }
+        if layout.align() > layout.size() {
+            unimplemented!("Memory with align > size is requested, unimplemented.");
+        }
+    }
+
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        todo!()
+    }
+}
+
 /// Inits slab caches
 pub fn init() {
     // Init SlabInfo cache
@@ -132,134 +149,73 @@ pub fn init() {
         )
     });
 
+    if size_of::<SlabInfo>() > 64 {
+        log::warn!("SlabInfo is growing, perhaps we should reconsider ObjectSizeType types in caches?");
+    }
     // Init generic caches
     // 16
-    log::debug!("16");
     init_static_generic_cache!(
         GENERIC_CACHE16,
         4096,
         ObjectSizeType::Small,
         DefaultMemoryBackend
     );
-    unsafe {
-        let allocated_ptr = GENERIC_CACHE16.get().unwrap().lock().alloc();
-        assert!(!allocated_ptr.is_null());
-        assert!(allocated_ptr.is_aligned());
-        allocated_ptr.write_bytes(0, 1);
-        GENERIC_CACHE16.get().unwrap().lock().free(allocated_ptr);
-    }
 
     // 32
-    log::debug!("32");
     init_static_generic_cache!(
         GENERIC_CACHE32,
         4096,
         ObjectSizeType::Small,
         DefaultMemoryBackend
     );
-    unsafe {
-        let allocated_ptr = GENERIC_CACHE32.get().unwrap().lock().alloc();
-        assert!(!allocated_ptr.is_null());
-        assert!(allocated_ptr.is_aligned());
-        allocated_ptr.write_bytes(0, 1);
-        GENERIC_CACHE32.get().unwrap().lock().free(allocated_ptr);
-    }
 
     // 64
-    log::debug!("64");
     init_static_generic_cache!(
         GENERIC_CACHE64,
         4096,
         ObjectSizeType::Small,
         DefaultMemoryBackend
     );
-    unsafe {
-        let allocated_ptr = GENERIC_CACHE64.get().unwrap().lock().alloc();
-        assert!(!allocated_ptr.is_null());
-        assert!(allocated_ptr.is_aligned());
-        allocated_ptr.write_bytes(0, 1);
-        GENERIC_CACHE64.get().unwrap().lock().free(allocated_ptr);
-    }
 
     // 128
-    log::debug!("128");
     init_static_generic_cache!(
         GENERIC_CACHE128,
         4096,
         ObjectSizeType::Small,
         DefaultMemoryBackend
     );
-    unsafe {
-        let allocated_ptr = GENERIC_CACHE128.get().unwrap().lock().alloc();
-        assert!(!allocated_ptr.is_null());
-        assert!(allocated_ptr.is_aligned());
-        allocated_ptr.write_bytes(0, 1);
-        GENERIC_CACHE128.get().unwrap().lock().free(allocated_ptr);
-    }
 
     // 256
-    log::debug!("256");
     init_static_generic_cache!(
         GENERIC_CACHE256,
         4096,
-        ObjectSizeType::Small,
+        ObjectSizeType::Large,
         DefaultMemoryBackend
     );
-    unsafe {
-        let allocated_ptr = GENERIC_CACHE256.get().unwrap().lock().alloc();
-        assert!(!allocated_ptr.is_null());
-        assert!(allocated_ptr.is_aligned());
-        allocated_ptr.write_bytes(0, 1);
-        GENERIC_CACHE256.get().unwrap().lock().free(allocated_ptr);
-    }
 
     // 512
-    log::debug!("512");
     init_static_generic_cache!(
         GENERIC_CACHE512,
         4096,
         ObjectSizeType::Large,
         DefaultMemoryBackend
     );
-    unsafe {
-        let allocated_ptr = GENERIC_CACHE512.get().unwrap().lock().alloc();
-        assert!(!allocated_ptr.is_null());
-        assert!(allocated_ptr.is_aligned());
-        allocated_ptr.write_bytes(0, 1);
-        GENERIC_CACHE512.get().unwrap().lock().free(allocated_ptr);
-    }
 
     // 1024
-    log::debug!("1024");
     init_static_generic_cache!(
         GENERIC_CACHE1024,
         4096,
         ObjectSizeType::Large,
         DefaultMemoryBackend
     );
-    unsafe {
-        let allocated_ptr = GENERIC_CACHE1024.get().unwrap().lock().alloc();
-        assert!(!allocated_ptr.is_null());
-        assert!(allocated_ptr.is_aligned());
-        allocated_ptr.write_bytes(0, 1);
-        GENERIC_CACHE1024.get().unwrap().lock().free(allocated_ptr);
-    }
 
     // 2048
-    log::debug!("2048");
     init_static_generic_cache!(
         GENERIC_CACHE2048,
         4096,
         ObjectSizeType::Large,
         DefaultMemoryBackend
     );
-    unsafe {
-        let allocated_ptr = GENERIC_CACHE2048.get().unwrap().lock().alloc();
-        assert!(!allocated_ptr.is_null());
-        assert!(allocated_ptr.is_aligned());
-        allocated_ptr.write_bytes(0, 1);
-        GENERIC_CACHE2048.get().unwrap().lock().free(allocated_ptr);
-    }
 }
 
 struct DefaultMemoryBackend;
@@ -278,11 +234,6 @@ impl MemoryBackend for DefaultMemoryBackend {
                 MemoryZoneEnum::Dma32,
             ],
             slab_size,
-        );
-        log::debug!("allocated_slab_phys_addr: {phys_addr:p}");
-        log::debug!(
-            "allocated_slab_virt_addr: {:p}",
-            super::virtual_memory_manager::phys_addr_to_cpmm_virt_addr(phys_addr)
         );
         if phys_addr.is_null() {
             return null_mut();

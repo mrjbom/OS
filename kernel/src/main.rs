@@ -1,4 +1,5 @@
 #![feature(abi_x86_interrupt)]
+#![feature(allocator_api)]
 #![no_std]
 #![no_main]
 
