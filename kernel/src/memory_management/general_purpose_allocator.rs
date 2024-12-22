@@ -1,6 +1,6 @@
 use crate::memory_management::physical_memory_manager::MemoryZoneEnum;
 use crate::memory_management::PAGE_SIZE;
-use core::alloc::{AllocError, Layout};
+use core::alloc::{AllocError, Allocator, Layout};
 use core::ptr::{null_mut, NonNull};
 use spin::{Mutex, Once};
 use x86_64::{PhysAddr, VirtAddr};
@@ -118,10 +118,38 @@ pub struct GeneralPurposeAllocator;
 
 unsafe impl core::alloc::Allocator for GeneralPurposeAllocator {
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-        todo!()
+        if layout.size() == 0 || layout.align() == 0 {
+            panic!("Invalid layout requested, maybe bug");
+        }
+        let allocated_ptr = unsafe {
+            DLMALLOC_ALLOCATOR
+                .get()
+                .expect("dlmalloc allocator not set")
+                .lock()
+                .malloc(layout.size(), layout.align())
+        };
+        if allocated_ptr.is_null() {
+            return Err(AllocError);
+        }
+        debug_assert!(allocated_ptr.is_aligned(), "dlmalloc allocs unaligned ptr");
+
+        let slice = unsafe {
+            NonNull::slice_from_raw_parts(NonNull::new_unchecked(allocated_ptr), layout.size())
+        };
+        Ok(slice)
     }
 
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        todo!()
+        if !ptr.is_aligned() || layout.size() == 0 || layout.align() == 0 {
+            panic!("Invalid deallocate parameters");
+        }
+
+        unsafe {
+            DLMALLOC_ALLOCATOR
+                .get()
+                .expect("dlmalloc allocator not set")
+                .lock()
+                .free(ptr.as_ptr(), layout.size(), layout.align());
+        }
     }
 }
