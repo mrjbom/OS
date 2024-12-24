@@ -804,7 +804,7 @@ pub unsafe fn free(freed_addr: PhysAddr) {
 /// Reallocs memory, like C realloc
 pub unsafe fn realloc(phys_addr: PhysAddr, requested_size: usize, ignore_data: bool) -> *mut u8 {
     if !ignore_data {
-        unimplemented!("unimplemented: Since the buddy allocator works with physical memory, it will not be able to move data");
+        unimplemented!("Since the buddy allocator works with physical memory, it will not be able to move data");
     }
     let memory_zone = get_zone_allocator_by_addr(phys_addr);
 

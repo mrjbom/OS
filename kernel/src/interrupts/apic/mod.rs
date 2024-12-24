@@ -20,46 +20,50 @@ enum LocalApicVersion {
 }
 
 /// By default, local APIC base, APIC registers are placed on this physical page
-const BASE_ADDR: PhysAddr = PhysAddr::new(0xFEE00000);
+const BASE_PHYS_ADDR: PhysAddr = PhysAddr::new(0xFEE00000);
 
 /// Virtual address of local APIC base in Complete Physical Memory Mapping
 ///
 /// ## Must be mapped without caching
-const BASE_MAPPED_ADDR: VirtAddr = virtual_memory_manager::phys_addr_to_cpmm_virt_addr(BASE_ADDR);
+const BASE_VIRT_ADDR: VirtAddr =
+    virtual_memory_manager::phys_addr_to_cpmm_virt_addr(BASE_PHYS_ADDR);
 
 // Registers
 /// 0x30    Local APIC Version Register
-const VERSION_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0x30) as *mut u32;
+const VERSION_REGISTER: *mut u32 = (BASE_VIRT_ADDR.as_u64() + 0x30) as *mut u32;
 
 /// 0xB0    End Of Interrupt Register
-const EOI_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0xB0) as *mut u32;
+const EOI_REGISTER: *mut u32 = (BASE_VIRT_ADDR.as_u64() + 0xB0) as *mut u32;
 
 /// 0xF0    Spurious-Interrupt Vector Register
-const SPURIOUS_INTERRUPT_VECTOR_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0xF0) as *mut u32;
+const SPURIOUS_INTERRUPT_VECTOR_REGISTER: *mut u32 = (BASE_VIRT_ADDR.as_u64() + 0xF0) as *mut u32;
 
 /// 0x320   LVT Timer Register
-const LVT_TIMER_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0x320) as *mut u32;
+const LVT_TIMER_REGISTER: *mut u32 = (BASE_VIRT_ADDR.as_u64() + 0x320) as *mut u32;
 
 /// 0x350   LVT LINT0 Register
-const LVT_LINT0_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0x350) as *mut u32;
+const LVT_LINT0_REGISTER: *mut u32 = (BASE_VIRT_ADDR.as_u64() + 0x350) as *mut u32;
 
 /// 0x360   LVT LINT1 Register
-const LVT_LINT1_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0x360) as *mut u32;
+const LVT_LINT1_REGISTER: *mut u32 = (BASE_VIRT_ADDR.as_u64() + 0x360) as *mut u32;
 
 /// 0x370   LVT Error Register
-const LVT_ERROR_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0x370) as *mut u32;
+const LVT_ERROR_REGISTER: *mut u32 = (BASE_VIRT_ADDR.as_u64() + 0x370) as *mut u32;
 
 /// 0x380   Initial Count Register
-const INITIAL_COUNT_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0x380) as *mut u32;
+const INITIAL_COUNT_REGISTER: *mut u32 = (BASE_VIRT_ADDR.as_u64() + 0x380) as *mut u32;
 
 /// 0x390   Current Count Register
-const CURRENT_COUNT_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0x390) as *mut u32;
+const CURRENT_COUNT_REGISTER: *mut u32 = (BASE_VIRT_ADDR.as_u64() + 0x390) as *mut u32;
 
 /// 0x3E0   Divide Configuration Register
-const DIVIDE_CONFIGURATION_REGISTER: *mut u32 = (BASE_MAPPED_ADDR.as_u64() + 0x3E0) as *mut u32;
+const DIVIDE_CONFIGURATION_REGISTER: *mut u32 = (BASE_VIRT_ADDR.as_u64() + 0x3E0) as *mut u32;
 
 /// Inits Local APIC for this CPU (BSP)
 pub fn init() {
+    // Disable interrupts
+    x86_64::instructions::interrupts::disable();
+
     // Check APIC support
     let cpuid = CpuId::new();
     let cpuid_feature_info = cpuid
@@ -75,7 +79,7 @@ pub fn init() {
         x86_64::align_down(ia32_apic_base_msr, PAGE_SIZE as u64);
     assert_eq!(
         apic_base_page_phys_addr_from_msr,
-        BASE_ADDR.as_u64(),
+        BASE_PHYS_ADDR.as_u64(),
         "The APIC base address is not on the default page!"
     );
 
@@ -86,12 +90,12 @@ pub fn init() {
     // address space with an initial starting address of FEE00000H. For correct APIC operation, this address space must
     // be mapped to an area of memory that has been designated as strong uncacheable (UC)
     virtual_memory_manager::set_flags_in_page_table(
-        BASE_MAPPED_ADDR,
+        BASE_VIRT_ADDR,
         PageTableLevel::One,
         PageTableFlags::NO_CACHE | PageTableFlags::WRITE_THROUGH,
         true,
     );
-    tlb::flush(BASE_MAPPED_ADDR);
+    tlb::flush(BASE_VIRT_ADDR);
 
     // Determine whether the 82489DX is a discrete APIC or an Integrated APIC using the Local APIC Version Register
     // Version bits 0-7:
@@ -104,9 +108,6 @@ pub fn init() {
         0x10..=0x15 => LOCAL_APIC_VERSION.call_once(|| LocalApicVersion::Integrated),
         _ => unreachable!("Reserved value"),
     };
-
-    // Disable interrupts
-    x86_64::instructions::interrupts::disable();
 
     // Disable PIC
     // # https://wiki.osdev.org/8259_PIC#Disabling
@@ -128,8 +129,11 @@ pub fn init() {
     // https://wiki.osdev.org/APIC_Timer#Enabling_APIC_Timer
     //fill_lvt_timer_register();
 
-    // Init IO APIC
+    // Configure IO APIC
     ioapic::init();
+
+    // Enable interrupts
+    x86_64::instructions::interrupts::enable();
 }
 
 /// Set and unmasks APIC Timer interrupt vector <br>

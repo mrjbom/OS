@@ -25,7 +25,9 @@ pub fn init() {
 
 /// Disables PIC and inits local APIC, IO APIC, enables interrupts
 pub fn go_to_apic() {
-    // Init local APIC and IO APIC
+    x86_64::instructions::interrupts::disable();
+
+    // Init Local APIC and IO APIC
     apic::init();
 
     // Enable interrupts
@@ -38,6 +40,7 @@ const LOCAL_APIC_TIMER_IDT_VECTOR: u8 = 48;
 const LOCAL_APIC_LINT0_IDT_VECTOR: u8 = 49;
 const LOCAL_APIC_LINT1_IDT_VECTOR: u8 = 50;
 const LOCAL_APIC_ERROR_IDT_VECTOR: u8 = 51;
+const LOCAL_APIC_ISA_IRQ_VECTORS_RANGE: RangeInclusive<u8> = 52..=67;
 const LOCAL_APIC_SPURIOUS_IDT_VECTOR: u8 = 255;
 
 /// A general handler function for an interrupt or an exception with the interrupt/exception index and an optional error code
@@ -48,7 +51,8 @@ const LOCAL_APIC_SPURIOUS_IDT_VECTOR: u8 = 255;
 /// 49      Local APIC LINT0<br>
 /// 50      Local APIC LINT1<br>
 /// 51      Local APIC Error<br>
-/// 255     Local APIC Spurious-Interrupt Vector Register (handler must do nothing (and even don't send an EOI))
+/// 52-67   ISA IRQ's from PIC hardware interrupts remaped after APIC initialization
+/// 255     Local APIC Spurious-Interrupt (handler must do nothing (and even don't send an EOI))
 pub fn general_interrupt_handler(
     interrupt_stack_frame: InterruptStackFrame,
     index: u8,
@@ -86,32 +90,38 @@ pub fn general_interrupt_handler(
                 pit::handler();
             }
 
+            crate::serial_println_lock_free!("PIC IRQ interrupt {index}");
+
             #[allow(static_mut_refs)]
             unsafe {
                 pic::PICS.notify_end_of_interrupt(index);
             };
         }
         LOCAL_APIC_TIMER_IDT_VECTOR => {
-            //crate::serial_println_lock_free!("APIC TIMER interrupt");
+            crate::serial_println_lock_free!("LOCAL APIC TIMER interrupt");
             apic::send_eoi();
         }
         LOCAL_APIC_LINT0_IDT_VECTOR => {
-            //crate::serial_println_lock_free!("APIC LINT0 interrupt");
+            crate::serial_println_lock_free!("LOCAL APIC LINT0 interrupt");
             apic::send_eoi();
         }
         LOCAL_APIC_LINT1_IDT_VECTOR => {
-            //crate::serial_println_lock_free!("APIC LINT1 interrupt");
+            crate::serial_println_lock_free!("LOCAL APIC LINT1 interrupt");
             apic::send_eoi();
         }
         LOCAL_APIC_ERROR_IDT_VECTOR => {
-            crate::serial_println_lock_free!("APIC ERROR interrupt");
+            crate::serial_println_lock_free!("LOCAL APIC ERROR interrupt");
             apic::send_eoi();
         }
         LOCAL_APIC_SPURIOUS_IDT_VECTOR => {
-            crate::serial_println_lock_free!("APIC SPURIOUS interrupt");
+            crate::serial_println_lock_free!("LOCAL APIC SPURIOUS interrupt");
+        }
+        index if LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.contains(&index) => {
+            crate::serial_println_lock_free!("IO APIC ISA IRQ interrupt {index}");
+            apic::send_eoi()
         }
         _ => {
-            unreachable!("Unexpected interrupt number!");
+            unreachable!("Unexpected interrupt number: {index}!");
         }
     }
 }
