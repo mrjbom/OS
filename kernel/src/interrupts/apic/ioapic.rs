@@ -115,20 +115,20 @@ pub fn init() {
         let isa_irq = interrupt_source_override.isa_source;
         let global_system_interrupt = interrupt_source_override.global_system_interrupt as usize;
 
-        // ISA IRQ connected to Global System Interrupt
-        // Example: IRQ = 0 and GSI = 2, RT[2].vector must set to IRQ's 0 vector (LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start()
+        // ISA IRQ connected to Global System Interrupt (IO APIC pin)
+        // Example: IRQ = 0 and GSI = 2, RT[2].vector must set to IRQ's 0 vector (LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() + 0
 
         let vector = LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() + isa_irq;
         assert!(
             LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.contains(&vector),
             "Invalid vector calculated! Bug."
         );
-        // Set vector of IRQ for GSI
+        // Set vector of IRQ for IO APIC pin
         redirection_table[global_system_interrupt].set_vector(vector as u64);
-        // Mask unused vector
-        redirection_table[isa_irq as usize].set_interrupt_mask(true);
-        // Unmask used vector (he could be masked if he himself had been reassigned earlier)
+        // Unmask used IO APIC pin (he could be masked if he himself had been reassigned earlier)
         redirection_table[global_system_interrupt].set_interrupt_mask(false);
+        // Mask unused IO APIC pin
+        redirection_table[isa_irq as usize].set_interrupt_mask(true);
 
         // Set Pin Polarity and Trigger Mode
         match interrupt_source_override.polarity {
@@ -150,6 +150,7 @@ pub fn init() {
             }
         }
     }
+    // All unused IO APIC pins masked now
 
     // Write redirection table
     assert_eq!(
