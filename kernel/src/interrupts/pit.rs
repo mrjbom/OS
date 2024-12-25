@@ -41,7 +41,6 @@ pub fn init(interval_in_milliseconds: u32) {
     let divisor: u16 = (BASE_FREQ / freq) as u16;
     // (godbolt tested) With Acquire just mov is used, with SeqCst xchg used, thats blocks the bus (like lock prefix).
     MILLISECONDS_PER_TICK.store(interval_in_milliseconds, Ordering::SeqCst);
-    //log::debug!("freq: {freq}, divisor: {divisor}, MS_PER_TICK: {interval_in_milliseconds}");
 
     // Send operational command
     let mut ocw: u8 = 0;

@@ -1,7 +1,12 @@
 mod ioapic;
 
+use crate::acpi::ACPI_TABLES;
+use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
 use crate::memory_management::virtual_memory_manager;
 use crate::memory_management::PAGE_SIZE;
+use acpi_lib::platform::interrupt::{LocalInterruptLine, NmiProcessor};
+use acpi_lib::InterruptModel;
+use bitfield::bitfield;
 use raw_cpuid::CpuId;
 use x86_64::instructions::tlb;
 use x86_64::structures::paging::page_table::PageTableLevel;
@@ -142,10 +147,11 @@ pub fn init() {
 /// Mask                 16      = 0 - Unmasked <br>
 /// Timer Periodic Mode  17-18   = 00 - Fired only once <br>
 fn fill_lvt_timer_register() {
-    let mut register_value: u32 = 0;
-    register_value |= super::LOCAL_APIC_TIMER_IDT_VECTOR as u32;
+    let mut register_value = LvtRegister(0);
+    register_value.set_vector(super::LOCAL_APIC_TIMER_IDT_VECTOR as u32);
+
     unsafe {
-        LVT_TIMER_REGISTER.write_volatile(register_value);
+        LVT_TIMER_REGISTER.write_volatile(register_value.0);
     }
 }
 
@@ -158,10 +164,13 @@ fn fill_lvt_timer_register() {
 /// Trigger Mode                     15 = 0 - Edge Triggered <br>
 /// Mask                             16 = 0 - Unmasked <br>
 fn fill_lvt_lint0_register() {
-    let mut register_value: u32 = 0;
-    register_value |= super::LOCAL_APIC_LINT0_IDT_VECTOR as u32;
+    let mut register_value = LvtRegister(0);
+    register_value.set_vector(super::LOCAL_APIC_LINT0_IDT_VECTOR as u32);
+
+    set_nmi_if_needed(0, &mut register_value);
+
     unsafe {
-        LVT_LINT0_REGISTER.write_volatile(register_value);
+        LVT_LINT0_REGISTER.write_volatile(register_value.0);
     }
 }
 
@@ -174,10 +183,56 @@ fn fill_lvt_lint0_register() {
 /// Trigger Mode                     15 = 0 - Always Edge Triggered (Must be Edge Triggered for LINT1) <br>
 /// Mask                             16 = 0 - Unmasked <br>
 fn fill_lvt_lint1_register() {
-    let mut register_value: u32 = 0;
-    register_value |= super::LOCAL_APIC_LINT1_IDT_VECTOR as u32;
+    let mut register_value = LvtRegister(0);
+    register_value.set_vector(super::LOCAL_APIC_LINT1_IDT_VECTOR as u32);
+
+    set_nmi_if_needed(1, &mut register_value);
+
     unsafe {
-        LVT_LINT1_REGISTER.write_volatile(register_value);
+        LVT_LINT1_REGISTER.write_volatile(register_value.0);
+    }
+}
+
+fn set_nmi_if_needed(line_number: u8, lvt_register: &mut LvtRegister) {
+    let acpi_tables_lock = ACPI_TABLES.get().expect("ACPI TABLES not set").lock();
+    let platform_info = acpi_tables_lock
+        .platform_info_in(GeneralPurposeAllocator)
+        .expect("Failed to get platform info");
+    let bsp_uid = platform_info
+        .processor_info
+        .unwrap()
+        .boot_processor
+        .processor_uid;
+
+    if let InterruptModel::Apic(apic_info) = platform_info.interrupt_model {
+        for nmi_line in apic_info.local_apic_nmi_lines.iter() {
+            let mut lines_is_equ = false;
+            if let LocalInterruptLine::Lint0 = nmi_line.line {
+                if line_number == 0 {
+                    lines_is_equ = true;
+                }
+            } else if let LocalInterruptLine::Lint1 = nmi_line.line {
+                if line_number == 1 {
+                    lines_is_equ = true;
+                }
+            }
+
+            if lines_is_equ {
+                let mut need_set_nmi = false;
+                match nmi_line.processor {
+                    NmiProcessor::All => need_set_nmi = true,
+                    NmiProcessor::ProcessorUid(uid) => {
+                        if uid == bsp_uid {
+                            need_set_nmi = true;
+                        }
+                    }
+                }
+                if need_set_nmi {
+                    // Delivery mode: NMI
+                    lvt_register.set_delivery_mode(0b100);
+                }
+            }
+        }
     }
 }
 
@@ -186,10 +241,11 @@ fn fill_lvt_lint1_register() {
 /// Delivery Status                  12 = 0 - (Read Only) <br>
 /// Mask                             16 = 0 - Unmasked <br>
 fn fill_lvt_error_register() {
-    let mut register_value: u32 = 0;
-    register_value |= super::LOCAL_APIC_ERROR_IDT_VECTOR as u32;
+    let mut register_value = LvtRegister(0);
+    register_value.set_vector(super::LOCAL_APIC_ERROR_IDT_VECTOR as u32);
+
     unsafe {
-        LVT_ERROR_REGISTER.write_volatile(register_value);
+        LVT_ERROR_REGISTER.write_volatile(register_value.0);
     }
 }
 
@@ -220,4 +276,16 @@ pub fn send_eoi() {
     unsafe {
         EOI_REGISTER.write_volatile(0);
     }
+}
+
+bitfield! {
+    struct LvtRegister(u32);
+    vector, set_vector: 7, 0;
+    delivery_mode, set_delivery_mode: 10, 8;
+    delivery_status, set_delivery_status: 12;
+    interrupt_input_pin_polarity, set_interrupt_input_pin_polarity: 13;
+    remote_irr, set_remote_irr: 14;
+    trigger_mode, set_trigger_mode: 15;
+    mask, set_mask: 16;
+    timer_mode, set_timer_mode: 18, 17;
 }

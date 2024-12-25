@@ -90,8 +90,6 @@ pub fn general_interrupt_handler(
                 pit::handler();
             }
 
-            crate::serial_println_lock_free!("PIC IRQ interrupt {index}");
-
             #[allow(static_mut_refs)]
             unsafe {
                 pic::PICS.notify_end_of_interrupt(index);

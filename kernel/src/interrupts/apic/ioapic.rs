@@ -25,21 +25,18 @@ pub fn init() {
     let platform_info = acpi_tables_mutex_guard
         .platform_info_in(GeneralPurposeAllocator)
         .expect("Failed to get platform info using ACPI tables");
-
     assert!(
         platform_info.processor_info.is_some(),
         "Processor info in platform info not found!"
     );
 
     // Check platform info and get IO APIC address
-    log::debug!("PLATFORM INFO: {platform_info:#?}");
     let apic_info = match platform_info.interrupt_model {
         InterruptModel::Apic(ref apic_info) => {
             if apic_info.local_apic_address != super::BASE_PHYS_ADDR.as_u64() {
                 panic!("Local APIC address in MADT differs from used!");
             }
 
-            // todo: Implement multiple IO APIC support
             // I want to work with a single IO APIC and when GSI Base = 0.
             if apic_info.io_apics.len() == 0 {
                 panic!("No IO APIC detected!");
@@ -52,8 +49,9 @@ pub fn init() {
             }
 
             // todo: This doesn't seem to be used on a classic PC, nevertheless deal with it at your free time
+            // This lines cannot be used by devices
             if apic_info.nmi_sources.len() > 0 {
-                log::warn!("NMI source detected, implement this!");
+                unimplemented!("NMI source detected, implement this!");
             }
 
             // Get IO APIC address
@@ -116,7 +114,6 @@ pub fn init() {
     for interrupt_source_override in apic_info.interrupt_source_overrides.iter() {
         let isa_irq = interrupt_source_override.isa_source;
         let global_system_interrupt = interrupt_source_override.global_system_interrupt as usize;
-        log::debug!("ISO: {interrupt_source_override:?}");
 
         // ISA IRQ connected to Global System Interrupt
         // Example: IRQ = 0 and GSI = 2, RT[2].vector must set to IRQ's 0 vector (LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start()
