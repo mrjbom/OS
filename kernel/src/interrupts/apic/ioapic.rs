@@ -2,7 +2,7 @@ use crate::interrupts::LOCAL_APIC_ISA_IRQ_VECTORS_RANGE;
 use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
 use acpi_lib::madt::{Madt, MadtEntry};
 use acpi_lib::platform::interrupt::{Polarity, TriggerMode};
-use acpi_lib::{AcpiTable, InterruptModel};
+use acpi_lib::{AcpiTable, InterruptModel, ManagedSlice};
 use bitfield::bitfield;
 use core::ops::Add;
 use spin::Once;
@@ -79,21 +79,23 @@ pub fn init() {
         number_of_redirection_table_entries >= 24,
         "Number of redirection table entries in is less than 24, it looks like a bug"
     );
+    assert!(number_of_redirection_table_entries <= 64);
 
     // Fill redirection table
     // Fill with default value
-    assert!(
-        number_of_redirection_table_entries <= 64,
-        "Number of redirection table entries in is greater than 64, too many for array"
-    );
-    let mut redirection_table = ArrayVec::<[RedirectionTableEntry; 64]>::new();
+    let mut redirection_table: ManagedSlice<RedirectionTableEntry, GeneralPurposeAllocator> =
+        ManagedSlice::new_in(
+            number_of_redirection_table_entries as usize,
+            GeneralPurposeAllocator,
+        )
+        .expect("Failed to create slice");
     let bsp_apic_id = platform_info
         .processor_info
         .unwrap()
         .boot_processor
         .local_apic_id;
-    for i in 0..number_of_redirection_table_entries {
-        let vector = i + *LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() as u32;
+    for (i, entry) in redirection_table.iter_mut().enumerate() {
+        let vector = i + *LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() as usize;
         assert!(vector >= 0x10 && vector <= 0xFE);
         let mut entry: RedirectionTableEntry = RedirectionTableEntry(0);
         entry.set_vector(vector as u64);
@@ -101,10 +103,13 @@ pub fn init() {
         entry.set_destination_mode(false); // Physical
         entry.set_interrupt_input_pin_polarity(false); // High Active by default
         entry.set_trigger_mode(false); // Edge-triggered by default
-        entry.set_interrupt_mask(false); // Unmasked
+        entry.set_interrupt_mask(true); // Masked
         assert!(bsp_apic_id < 16); // 4 bytes
         entry.set_destination_field(bsp_apic_id as u64); // Destination - 4 bytes APIC ID for Physical Destination mode
-        redirection_table.push(entry);
+    }
+    // Unmask ISA IRQ's in redirection table
+    for i in 0..16 {
+        redirection_table[i].set_interrupt_mask(false);
     }
 
     // Modify the entries required by Interrupt Source Override table
@@ -222,10 +227,4 @@ bitfield! {
     trigger_mode, set_trigger_mode: 15;
     interrupt_mask, set_interrupt_mask: 16;
     destination_field, set_destination_field: 63, 56;
-}
-
-impl Default for RedirectionTableEntry {
-    fn default() -> Self {
-        Self(0)
-    }
 }

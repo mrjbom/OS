@@ -61,8 +61,6 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("APIC and IO APIC initialization");
     interrupts::go_to_apic();
 
-    loop {}
-
     x86_64::instructions::interrupts::disable();
     // Kernel finish
     log::info!("--- KERNEL FINISH ---");
