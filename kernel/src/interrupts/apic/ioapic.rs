@@ -29,6 +29,10 @@ pub fn init() {
         platform_info.processor_info.is_some(),
         "Processor info in platform info not found!"
     );
+    // UNDEFINED BEHAVIOR HERE
+    // If line commented - code not work
+    // If uncommented - ok
+    //log::debug!("PLATFORM INFO: {platform_info:#?}");
 
     // Check platform info and get IO APIC address
     let apic_info = match platform_info.interrupt_model {

@@ -115,7 +115,7 @@ pub fn general_interrupt_handler(
             crate::serial_println_lock_free!("LOCAL APIC SPURIOUS interrupt");
         }
         index if LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.contains(&index) => {
-            //crate::serial_println_lock_free!("IO APIC ISA IRQ interrupt {index}");
+            crate::serial_println_lock_free!("IO APIC ISA IRQ interrupt {index}");
             if index == 52 {
                 pit::handler();
             }
