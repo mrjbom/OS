@@ -64,9 +64,7 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     // MUST PRINT 52
     x86_64::instructions::interrupts::enable();
     log::debug!("Prints 52?");
-    loop {
-
-    }
+    loop {}
 
     x86_64::instructions::interrupts::disable();
     // Kernel finish

@@ -29,10 +29,6 @@ pub fn init() {
         platform_info.processor_info.is_some(),
         "Processor info in platform info not found!"
     );
-    // UNDEFINED BEHAVIOR HERE
-    // If line commented - code not work
-    // If uncommented - ok
-    //log::debug!("PLATFORM INFO: {platform_info:#?}");
 
     // Check platform info and get IO APIC address
     let apic_info = match platform_info.interrupt_model {
@@ -91,8 +87,10 @@ pub fn init() {
             GeneralPurposeAllocator,
         )
         .expect("Failed to create slice");
+    redirection_table.fill(RedirectionTableEntry(0));
     let bsp_apic_id = platform_info
         .processor_info
+        .as_ref()
         .unwrap()
         .boot_processor
         .local_apic_id;
@@ -219,6 +217,7 @@ fn write_ioapic_redirection_table_entry(
 }
 
 bitfield! {
+    #[derive(Copy, Clone)]
     struct RedirectionTableEntry(u64);
     vector, set_vector: 7, 0;
     delivery_mode, set_delivery_mode: 10, 8;
