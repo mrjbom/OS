@@ -48,12 +48,6 @@ pub fn init() {
                 unimplemented!("Global System Interrupt Base is not 0!");
             }
 
-            // todo: This doesn't seem to be used on a classic PC, nevertheless deal with it at your free time
-            // This lines cannot be used by devices
-            if apic_info.nmi_sources.len() > 0 {
-                unimplemented!("NMI source detected, implement this!");
-            }
-
             // Get IO APIC address
             IO_APIC_PHYS_ADDR.call_once(|| PhysAddr::new(apic_info.io_apics[0].address as u64));
             IO_APIC_VIRT_ADDR.call_once(|| {
@@ -122,7 +116,6 @@ pub fn init() {
 
         // ISA IRQ connected to Global System Interrupt (IO APIC pin)
         // Example: IRQ = 0 and GSI = 2, RT[2].vector must set to IRQ's 0 vector (LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() + 0
-        log::debug!("ISA IRQ: {}, GSI: {}", isa_irq, global_system_interrupt);
 
         let vector = LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() + isa_irq;
         assert!(
@@ -137,25 +130,28 @@ pub fn init() {
         redirection_table[global_system_interrupt].set_interrupt_mask(false);
 
         // Set Pin Polarity and Trigger Mode
-        match interrupt_source_override.polarity {
-            Polarity::ActiveHigh => {
-                redirection_table[global_system_interrupt].set_interrupt_input_pin_polarity(false)
-            }
-            Polarity::ActiveLow => {
-                redirection_table[global_system_interrupt].set_interrupt_input_pin_polarity(true)
-            }
-            Polarity::SameAsBus => {
-                redirection_table[global_system_interrupt].set_interrupt_input_pin_polarity(false)
-            }
-        }
-        match interrupt_source_override.trigger_mode {
-            TriggerMode::Edge => redirection_table[global_system_interrupt].set_trigger_mode(false),
-            TriggerMode::Level => redirection_table[global_system_interrupt].set_trigger_mode(true),
-            TriggerMode::SameAsBus => {
-                redirection_table[global_system_interrupt].set_trigger_mode(false)
-            }
-        }
+        set_acpi_lib_pin_polarity_and_trigger_mode(
+            interrupt_source_override.polarity,
+            interrupt_source_override.trigger_mode,
+            &mut redirection_table[global_system_interrupt],
+        );
     }
+
+    // Set NMI sources
+    for nmi_source in apic_info.nmi_sources.iter() {
+        // Unmask
+        redirection_table[nmi_source.global_system_interrupt as usize].set_interrupt_mask(false);
+        // Delivery Mode: NMI (vector ignored)
+        redirection_table[nmi_source.global_system_interrupt as usize].set_delivery_mode(0b100);
+        // Set Pin Polarity and Trigger Mode
+        // Must be edge triggered
+        set_acpi_lib_pin_polarity_and_trigger_mode(
+            nmi_source.polarity,
+            TriggerMode::Edge,
+            &mut redirection_table[nmi_source.global_system_interrupt as usize],
+        );
+    }
+
     // All unused IO APIC pins masked now
 
     // Write redirection table
@@ -232,4 +228,22 @@ bitfield! {
     trigger_mode, set_trigger_mode: 15;
     interrupt_mask, set_interrupt_mask: 16;
     destination_field, set_destination_field: 63, 56;
+}
+
+fn set_acpi_lib_pin_polarity_and_trigger_mode(
+    polarity: Polarity,
+    trigger_mode: TriggerMode,
+    redirection_table_entry: &mut RedirectionTableEntry,
+) {
+    // Set Pin Polarity and Trigger Mode
+    match polarity {
+        Polarity::ActiveHigh => redirection_table_entry.set_interrupt_input_pin_polarity(false),
+        Polarity::ActiveLow => redirection_table_entry.set_interrupt_input_pin_polarity(true),
+        Polarity::SameAsBus => redirection_table_entry.set_interrupt_input_pin_polarity(false),
+    }
+    match trigger_mode {
+        TriggerMode::Edge => redirection_table_entry.set_trigger_mode(false),
+        TriggerMode::Level => redirection_table_entry.set_trigger_mode(true),
+        TriggerMode::SameAsBus => redirection_table_entry.set_trigger_mode(false),
+    }
 }
