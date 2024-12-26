@@ -77,7 +77,10 @@ pub fn init() {
         number_of_redirection_table_entries >= 24,
         "Number of redirection table entries in is less than 24, it looks like a bug"
     );
-    assert!(number_of_redirection_table_entries <= 64);
+    assert!(
+        number_of_redirection_table_entries <= 64,
+        "Redirection table > 64, bug?"
+    );
 
     // Fill redirection table
     // Fill with default value
@@ -97,7 +100,6 @@ pub fn init() {
     for (i, entry) in redirection_table.iter_mut().enumerate() {
         let vector = i + *LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() as usize;
         assert!(vector >= 0x10 && vector <= 0xFE);
-        let mut entry: RedirectionTableEntry = RedirectionTableEntry(0);
         entry.set_vector(vector as u64);
         entry.set_delivery_mode(0); // Fixed
         entry.set_destination_mode(false); // Physical
@@ -107,6 +109,7 @@ pub fn init() {
         assert!(bsp_apic_id < 16); // 4 bytes
         entry.set_destination_field(bsp_apic_id as u64); // Destination - 4 bytes APIC ID for Physical Destination mode
     }
+
     // Unmask ISA IRQ's in redirection table
     for i in 0..16 {
         redirection_table[i].set_interrupt_mask(false);
@@ -119,6 +122,7 @@ pub fn init() {
 
         // ISA IRQ connected to Global System Interrupt (IO APIC pin)
         // Example: IRQ = 0 and GSI = 2, RT[2].vector must set to IRQ's 0 vector (LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() + 0
+        log::debug!("ISA IRQ: {}, GSI: {}", isa_irq, global_system_interrupt);
 
         let vector = LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() + isa_irq;
         assert!(
@@ -127,10 +131,10 @@ pub fn init() {
         );
         // Set vector of IRQ for IO APIC pin
         redirection_table[global_system_interrupt].set_vector(vector as u64);
-        // Unmask used IO APIC pin (he could be masked if he himself had been reassigned earlier)
-        redirection_table[global_system_interrupt].set_interrupt_mask(false);
         // Mask unused IO APIC pin
         redirection_table[isa_irq as usize].set_interrupt_mask(true);
+        // Unmask used IO APIC pin (he could be masked if he himself had been reassigned earlier)
+        redirection_table[global_system_interrupt].set_interrupt_mask(false);
 
         // Set Pin Polarity and Trigger Mode
         match interrupt_source_override.polarity {
