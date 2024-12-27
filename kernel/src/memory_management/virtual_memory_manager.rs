@@ -51,8 +51,7 @@ pub const fn virt_addr_from_cpmm_to_phys_addr(virt_addr: VirtAddr) -> PhysAddr {
 
 /// Sets flags to value in selected page table level by virtual addr
 ///
-/// # Attention!<br>
-/// Since 2 MB pages may be used (for example, by bootloader complete physical memory mapping) where PT does not exist, instead of PT, the flags will be applied to PD.
+/// If the selected page table level does not exist due to huge (2MB or 1GB) page using, the flags will be applied to the existing level above.
 ///
 /// Doesn't flush TLB
 pub fn set_flags_in_page_table(
@@ -69,34 +68,20 @@ pub fn set_flags_in_page_table(
         debug_assert!(!page_table.is_null(), "Page table null ptr");
         debug_assert!(page_table.is_aligned(), "Not aligned page table address");
 
-        let index = virt_addr.page_table_index(current_level);
-        // PT change requested, we are now checking PD. Due to two megabyte pages PT may not exist, we need to check this.
-        if current_level == PageTableLevel::Two && page_table_level == PageTableLevel::One {
-            // Check if 2 MB pages used
-            let pd = page_table;
-            unsafe {
-                // 2 MB page used, PT not exist
-                if (*pd)[index].flags().contains(PageTableFlags::HUGE_PAGE) {
-                    let mut flags = (*pd)[index].flags();
-                    flags.set(page_table_flags, value);
-                    (*pd)[index].set_flags(flags);
-                    break;
-                }
-            }
-        }
-        // todo: add 1GB page detection (may used by bootloader)
-        // https://github.com/rust-osdev/bootloader/issues/472
-        //debug_assert!(current_level == PageTableLevel::Three && unsafe {(*page_table)[index].flags().contains(PageTableFlags::HUGE_PAGE)}, "Looks like bootloader has started using 1GB pages for memory mapping, need to take that into account");
-
-        if current_level == page_table_level {
-            unsafe {
+        unsafe {
+            let index = virt_addr.page_table_index(current_level);
+            if current_level == page_table_level
+                || (*page_table)[index]
+                    .flags()
+                    .contains(PageTableFlags::HUGE_PAGE)
+            {
                 let mut flags = (*page_table)[index].flags();
                 flags.set(page_table_flags, value);
                 (*page_table)[index].set_flags(flags);
+                return;
             }
-            break;
+            current_level = current_level.next_lower_level().unwrap();
+            page_table_phys_addr = (*page_table)[index].addr();
         }
-        current_level = current_level.next_lower_level().unwrap();
-        page_table_phys_addr = unsafe { (*page_table)[index].addr() };
     }
 }
