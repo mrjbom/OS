@@ -148,7 +148,7 @@ pub fn init() {
 /// Timer Periodic Mode  17-18   = 00 - Fired only once <br>
 fn fill_lvt_timer_register() {
     let mut register_value = LvtRegister(0);
-    register_value.set_vector(super::LOCAL_APIC_TIMER_IDT_VECTOR as u32);
+    register_value.set_vector(super::idt::LOCAL_APIC_TIMER_IDT_VECTOR as u32);
 
     unsafe {
         LVT_TIMER_REGISTER.write_volatile(register_value.0);
@@ -165,7 +165,7 @@ fn fill_lvt_timer_register() {
 /// Mask                             16 = 0 - Unmasked <br>
 fn fill_lvt_lint0_register() {
     let mut register_value = LvtRegister(0);
-    register_value.set_vector(super::LOCAL_APIC_LINT0_IDT_VECTOR as u32);
+    register_value.set_vector(super::idt::LOCAL_APIC_LINT0_IDT_VECTOR as u32);
 
     set_nmi_if_needed(0, &mut register_value);
 
@@ -184,7 +184,7 @@ fn fill_lvt_lint0_register() {
 /// Mask                             16 = 0 - Unmasked <br>
 fn fill_lvt_lint1_register() {
     let mut register_value = LvtRegister(0);
-    register_value.set_vector(super::LOCAL_APIC_LINT1_IDT_VECTOR as u32);
+    register_value.set_vector(super::idt::LOCAL_APIC_LINT1_IDT_VECTOR as u32);
 
     set_nmi_if_needed(1, &mut register_value);
 
@@ -242,7 +242,7 @@ fn set_nmi_if_needed(line_number: u8, lvt_register: &mut LvtRegister) {
 /// Mask                             16 = 0 - Unmasked <br>
 fn fill_lvt_error_register() {
     let mut register_value = LvtRegister(0);
-    register_value.set_vector(super::LOCAL_APIC_ERROR_IDT_VECTOR as u32);
+    register_value.set_vector(super::idt::LOCAL_APIC_ERROR_IDT_VECTOR as u32);
 
     unsafe {
         LVT_ERROR_REGISTER.write_volatile(register_value.0);
@@ -256,12 +256,12 @@ fn fill_lvt_error_register() {
 /// EOI-Broadcast Suppression        12 = 0 Disabled <br>
 fn fill_spurious_interrupt_vector_register() {
     assert_eq!(
-        super::LOCAL_APIC_SPURIOUS_IDT_VECTOR & 0b00001111,
+        super::idt::LOCAL_APIC_SPURIOUS_IDT_VECTOR & 0b00001111,
         0b00001111,
         "Invalid spurious vector number"
     );
     let mut register_value: u32 = 0;
-    register_value |= super::LOCAL_APIC_SPURIOUS_IDT_VECTOR as u32;
+    register_value |= super::idt::LOCAL_APIC_SPURIOUS_IDT_VECTOR as u32;
     // Set 8 bit (Enabled by default!)
     register_value |= 1 << 8;
 

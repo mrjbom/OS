@@ -1,4 +1,4 @@
-use crate::interrupts::LOCAL_APIC_ISA_IRQ_VECTORS_RANGE;
+use super::super::idt::LOCAL_APIC_ISA_IRQ_VECTORS_RANGE;
 use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
 use acpi_lib::madt::{Madt, MadtEntry};
 use acpi_lib::platform::interrupt::{Polarity, TriggerMode};
