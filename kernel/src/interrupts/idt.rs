@@ -93,6 +93,7 @@ pub fn general_interrupt_handler(
         }
         LOCAL_APIC_SPURIOUS_IDT_VECTOR => {
             crate::serial_println_lock_free!("LOCAL APIC SPURIOUS interrupt");
+            return;
         }
         index if LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.contains(&index) => {
             crate::serial_println_lock_free!("IO APIC ISA IRQ interrupt {index}");
