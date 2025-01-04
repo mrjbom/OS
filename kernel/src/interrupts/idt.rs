@@ -4,7 +4,7 @@ use x86_64::structures::idt::{ExceptionVector, InterruptDescriptorTable, Interru
 
 static mut IDT: InterruptDescriptorTable = InterruptDescriptorTable::new();
 
-/// Creates and loads IDT
+/// Fills IDT
 pub fn init() {
     #[allow(static_mut_refs)]
     unsafe {
@@ -25,7 +25,7 @@ pub const LOCAL_APIC_SPURIOUS_IDT_VECTOR: u8 = 255;
 /// A general handler function for an interrupt or an exception with the interrupt/exception index and an optional error code
 ///
 /// 0-31    CPU exceptions<br>
-/// 32-47   Legacy ISA IRQ's
+/// 32-47   IO APIC Legacy ISA IRQ's
 /// 48      Local APIC Timer<br>
 /// 49      Local APIC LINT0<br>
 /// 50      Local APIC LINT1<br>

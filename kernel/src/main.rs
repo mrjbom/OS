@@ -45,6 +45,9 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("GDT initialization");
     gdt::init();
 
+    // Fill IDT
+    interrupts::idt::init();
+
     // Init memory manager
     log::info!("Memory Manager initialization");
     memory_management::init(boot_info);
