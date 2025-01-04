@@ -69,16 +69,6 @@ pub fn init() {
     // Disable interrupts
     x86_64::instructions::interrupts::disable();
 
-    // Disable PIC
-    // # https://wiki.osdev.org/8259_PIC#Disabling
-    // We can't use PIC now, IO APIC required.
-    // On qemu and bochs interrupts from PIT to PIC on vector 32 after APIC activation were generated, but not on Virtual Box.
-    // The use of IO APIC is required.
-    #[allow(static_mut_refs)]
-    unsafe {
-        super::pic::PICS.disable();
-    };
-
     // Check APIC support
     let cpuid = CpuId::new();
     let cpuid_feature_info = cpuid
@@ -134,7 +124,7 @@ pub fn init() {
     // https://wiki.osdev.org/APIC_Timer#Enabling_APIC_Timer
     //fill_lvt_timer_register();
 
-    // Configure IO APIC
+    // Configure IO APIC for Legacy ISA IRQ's
     ioapic::init();
 
     // Enable interrupts

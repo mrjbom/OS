@@ -45,10 +45,6 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("GDT initialization");
     gdt::init();
 
-    // Init and enable interrupts (PIC)
-    log::info!("PIC interrupts initialization and enabling");
-    interrupts::init();
-
     // Init memory manager
     log::info!("Memory Manager initialization");
     memory_management::init(boot_info);
@@ -57,13 +53,13 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("Getting ACPI tables");
     acpi::init(boot_info);
 
-    // Init APIC, IO APIC and enable interrupts
-    log::info!("APIC and IO APIC initialization");
-    interrupts::go_to_apic();
+    // Init and enable interrupts (IO APIC, Bootstrap Processor Local APIC)
+    log::info!("PIC interrupts initialization and enabling");
+    interrupts::init();
 
-    // MUST PRINT 52
+    // MUST PRINT 32
     x86_64::instructions::interrupts::enable();
-    log::debug!("Prints 52?");
+    log::debug!("Prints 32?");
     loop {}
 
     x86_64::instructions::interrupts::disable();

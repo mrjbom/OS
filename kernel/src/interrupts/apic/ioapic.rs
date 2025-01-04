@@ -1,4 +1,3 @@
-use super::super::idt::LOCAL_APIC_ISA_IRQ_VECTORS_RANGE;
 use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
 use acpi_lib::madt::{Madt, MadtEntry};
 use acpi_lib::platform::interrupt::{Polarity, TriggerMode};
@@ -8,6 +7,7 @@ use core::ops::Add;
 use spin::Once;
 use tinyvec::ArrayVec;
 use x86_64::{PhysAddr, VirtAddr};
+use crate::interrupts::idt::IO_APIC_ISA_IRQ_VECTORS_RANGE;
 
 static IO_APIC_PHYS_ADDR: Once<PhysAddr> = Once::new();
 
@@ -69,7 +69,7 @@ pub fn init() {
     let number_of_redirection_table_entries = ((read_ioapic_register(0x01) & 0xFF0000) >> 16) + 1;
     assert!(
         number_of_redirection_table_entries >= 24,
-        "Number of redirection table entries in is less than 24, it looks like a bug"
+        "Number of redirection table entries in is less than 24, bug"
     );
 
     // Fill redirection table
@@ -88,7 +88,7 @@ pub fn init() {
         .boot_processor
         .local_apic_id;
     for (i, entry) in redirection_table.iter_mut().enumerate() {
-        let vector = i + *LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() as usize;
+        let vector = i + *IO_APIC_ISA_IRQ_VECTORS_RANGE.start() as usize;
         assert!(vector >= 0x10 && vector <= 0xFE);
         entry.set_vector(vector as u64);
         entry.set_delivery_mode(0); // Fixed
@@ -111,11 +111,11 @@ pub fn init() {
         let global_system_interrupt = interrupt_source_override.global_system_interrupt as usize;
 
         // ISA IRQ connected to Global System Interrupt (IO APIC pin)
-        // Example: IRQ = 0 and GSI = 2, RT[2].vector must set to IRQ's 0 vector (LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() + 0
+        // Example: IRQ = 0 and GSI = 2, RT[2].vector must set to IRQ's 0 vector (IO_APIC_ISA_IRQ_VECTORS_RANGE.start() + 0
 
-        let vector = LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.start() + isa_irq;
+        let vector = IO_APIC_ISA_IRQ_VECTORS_RANGE.start() + isa_irq;
         assert!(
-            LOCAL_APIC_ISA_IRQ_VECTORS_RANGE.contains(&vector),
+            IO_APIC_ISA_IRQ_VECTORS_RANGE.contains(&vector),
             "Invalid vector calculated! Bug."
         );
         // Set vector of IRQ for IO APIC pin
@@ -132,6 +132,9 @@ pub fn init() {
             &mut redirection_table[global_system_interrupt],
         );
     }
+    // Must contain 15 unmasked entries (16 Legacy ISA IRQ interrupts minus cascade)
+    // (But maybe some stupid emulator/hardware may do something else)
+    assert_eq!(redirection_table.iter().filter(|redirection_table_entry| redirection_table_entry.interrupt_mask() == false).count(), 15, "Redirection table must contain 15 entries, bug (or stupid hardware/emulator if left is 16)");
 
     // Set NMI sources
     for nmi_source in apic_info.nmi_sources.iter() {
@@ -157,6 +160,7 @@ pub fn init() {
         "Redirection table len() incorrect! Bug."
     );
     for (index, entry) in redirection_table.iter().enumerate() {
+        //log::debug!("[{index}]: {}, {}", entry.vector(), entry.interrupt_mask());
         write_ioapic_redirection_table_entry(index as u8, entry);
     }
 }
