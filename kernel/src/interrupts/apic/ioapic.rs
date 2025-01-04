@@ -1,3 +1,4 @@
+use crate::interrupts::idt::IO_APIC_ISA_IRQ_VECTORS_RANGE;
 use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
 use acpi_lib::madt::{Madt, MadtEntry};
 use acpi_lib::platform::interrupt::{Polarity, TriggerMode};
@@ -7,7 +8,6 @@ use core::ops::Add;
 use spin::Once;
 use tinyvec::ArrayVec;
 use x86_64::{PhysAddr, VirtAddr};
-use crate::interrupts::idt::IO_APIC_ISA_IRQ_VECTORS_RANGE;
 
 static IO_APIC_PHYS_ADDR: Once<PhysAddr> = Once::new();
 

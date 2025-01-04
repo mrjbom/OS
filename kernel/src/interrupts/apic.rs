@@ -183,7 +183,7 @@ fn fill_lvt_lint1_register() {
     }
 }
 
-fn set_nmi_if_needed(line_number: u8, lvt_register: &mut LvtRegister) {
+fn set_nmi_if_needed(local_interrupt_line: LocalInterruptLine, lvt_register: &mut LvtRegister) {
     let acpi_tables_lock = ACPI_TABLES.get().expect("ACPI TABLES not set").lock();
     let platform_info = acpi_tables_lock
         .platform_info_in(GeneralPurposeAllocator)
@@ -196,18 +196,7 @@ fn set_nmi_if_needed(line_number: u8, lvt_register: &mut LvtRegister) {
 
     if let InterruptModel::Apic(apic_info) = platform_info.interrupt_model {
         for nmi_line in apic_info.local_apic_nmi_lines.iter() {
-            let mut lines_is_equ = false;
-            if let LocalInterruptLine::Lint0 = nmi_line.line {
-                if line_number == 0 {
-                    lines_is_equ = true;
-                }
-            } else if let LocalInterruptLine::Lint1 = nmi_line.line {
-                if line_number == 1 {
-                    lines_is_equ = true;
-                }
-            }
-
-            if lines_is_equ {
+            if nmi_line.line == local_interrupt_line {
                 let mut need_set_nmi = false;
                 match nmi_line.processor {
                     NmiProcessor::All => need_set_nmi = true,

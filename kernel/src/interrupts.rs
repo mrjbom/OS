@@ -8,6 +8,8 @@ pub mod pit;
 
 /// Fills IDT, inits IO APIC and bootstrap processor's Local APIC, enables interrupts
 pub fn init() {
+    x86_64::instructions::interrupts::enable();
+
     // Init and disable PIC
     pic::init_and_disable();
 
