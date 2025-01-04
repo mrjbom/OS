@@ -83,7 +83,7 @@ pub fn general_interrupt_handler(
             apic::send_eoi();
         }
         LOCAL_APIC_ERROR_IDT_VECTOR => {
-            crate::serial_println_lock_free!("LOCAL APIC ERROR interrupt");
+            panic!("LOCAL APIC ERROR interrupt");
             apic::send_eoi();
         }
         LOCAL_APIC_SPURIOUS_IDT_VECTOR => {
