@@ -69,6 +69,16 @@ pub fn init() {
     // Disable interrupts
     x86_64::instructions::interrupts::disable();
 
+    // Disable PIC
+    // # https://wiki.osdev.org/8259_PIC#Disabling
+    // We can't use PIC now, IO APIC required.
+    // On qemu and bochs interrupts from PIT to PIC on vector 32 after APIC activation were generated, but not on Virtual Box.
+    // The use of IO APIC is required.
+    #[allow(static_mut_refs)]
+    unsafe {
+        super::pic::PICS.disable();
+    };
+
     // Check APIC support
     let cpuid = CpuId::new();
     let cpuid_feature_info = cpuid
@@ -112,16 +122,6 @@ pub fn init() {
         0 => LOCAL_APIC_VERSION.call_once(|| LocalApicVersion::Descrete),
         0x10..=0x15 => LOCAL_APIC_VERSION.call_once(|| LocalApicVersion::Integrated),
         _ => unreachable!("Reserved value"),
-    };
-
-    // Disable PIC
-    // # https://wiki.osdev.org/8259_PIC#Disabling
-    // We can't use PIC now, IO APIC required.
-    // On qemu and bochs interrupts from PIT to PIC on vector 32 after APIC activation were generated, but not on Virtual Box.
-    // The use of IO APIC is required.
-    #[allow(static_mut_refs)]
-    unsafe {
-        super::pic::PICS.disable();
     };
 
     // APIC enabled by default, but interrupts masked, need unmask and set vectors

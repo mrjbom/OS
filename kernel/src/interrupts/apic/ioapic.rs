@@ -71,10 +71,6 @@ pub fn init() {
         number_of_redirection_table_entries >= 24,
         "Number of redirection table entries in is less than 24, it looks like a bug"
     );
-    assert!(
-        number_of_redirection_table_entries <= 64,
-        "Redirection table > 64, bug?"
-    );
 
     // Fill redirection table
     // Fill with default value
