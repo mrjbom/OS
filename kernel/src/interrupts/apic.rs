@@ -114,15 +114,13 @@ pub fn init() {
         _ => unreachable!("Reserved value"),
     };
 
-    // APIC enabled by default, but interrupts masked, need unmask and set vectors
+    // APIC enabled by default, but interrupts masked, need set vectors and unmask
     // Fill LVT registers (set and unmask vectors)
+    let bsp_uid = ACPI_TABLES.get().unwrap().lock().platform_info_in(GeneralPurposeAllocator).expect("Failed to get PlatformInfo").processor_info.as_ref().unwrap().boot_processor.processor_uid;
     fill_spurious_interrupt_vector_register();
-    fill_lvt_lint0_register();
-    fill_lvt_lint1_register();
+    fill_lvt_lint0_register(bsp_uid);
+    fill_lvt_lint1_register(bsp_uid);
     fill_lvt_error_register();
-    // APIC Timer must be enabled after configuration, this is done in its init code
-    // https://wiki.osdev.org/APIC_Timer#Enabling_APIC_Timer
-    //fill_lvt_timer_register();
 
     // Configure IO APIC for Legacy ISA IRQ's
     ioapic::init();
@@ -153,11 +151,11 @@ fn fill_lvt_timer_register() {
 /// Remote IRR                       14 = 0 - (Read Only) <br>
 /// Trigger Mode                     15 = 0 - Edge Triggered <br>
 /// Mask                             16 = 0 - Unmasked <br>
-fn fill_lvt_lint0_register() {
+fn fill_lvt_lint0_register(processor_uid: u32) {
     let mut register_value = LvtRegister(0);
     register_value.set_vector(super::idt::LOCAL_APIC_LINT0_IDT_VECTOR as u32);
 
-    set_nmi_if_needed(0, &mut register_value);
+    set_nmi_if_needed(&mut register_value, LocalInterruptLine::Lint0, processor_uid);
 
     unsafe {
         LVT_LINT0_REGISTER.write_volatile(register_value.0);
@@ -172,27 +170,23 @@ fn fill_lvt_lint0_register() {
 /// Remote IRR                       14 = 0 - (Read Only) <br>
 /// Trigger Mode                     15 = 0 - Always Edge Triggered (Must be Edge Triggered for LINT1) <br>
 /// Mask                             16 = 0 - Unmasked <br>
-fn fill_lvt_lint1_register() {
+fn fill_lvt_lint1_register(processor_uid: u32) {
     let mut register_value = LvtRegister(0);
     register_value.set_vector(super::idt::LOCAL_APIC_LINT1_IDT_VECTOR as u32);
 
-    set_nmi_if_needed(1, &mut register_value);
+    set_nmi_if_needed(&mut register_value, LocalInterruptLine::Lint1, processor_uid);
 
     unsafe {
         LVT_LINT1_REGISTER.write_volatile(register_value.0);
     }
 }
 
-fn set_nmi_if_needed(local_interrupt_line: LocalInterruptLine, lvt_register: &mut LvtRegister) {
+/// Sets NMI delivery mode for LINT# if it's required by ACPI table
+fn set_nmi_if_needed(lvt_register: &mut LvtRegister, local_interrupt_line: LocalInterruptLine, processor_uid: u32) {
     let acpi_tables_lock = ACPI_TABLES.get().expect("ACPI TABLES not set").lock();
     let platform_info = acpi_tables_lock
         .platform_info_in(GeneralPurposeAllocator)
         .expect("Failed to get platform info");
-    let bsp_uid = platform_info
-        .processor_info
-        .unwrap()
-        .boot_processor
-        .processor_uid;
 
     if let InterruptModel::Apic(apic_info) = platform_info.interrupt_model {
         for nmi_line in apic_info.local_apic_nmi_lines.iter() {
@@ -201,7 +195,7 @@ fn set_nmi_if_needed(local_interrupt_line: LocalInterruptLine, lvt_register: &mu
                 match nmi_line.processor {
                     NmiProcessor::All => need_set_nmi = true,
                     NmiProcessor::ProcessorUid(uid) => {
-                        if uid == bsp_uid {
+                        if uid == processor_uid {
                             need_set_nmi = true;
                         }
                     }

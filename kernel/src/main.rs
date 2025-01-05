@@ -57,7 +57,7 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     acpi::init(boot_info);
 
     // Init and enable interrupts (IO APIC, Bootstrap Processor Local APIC)
-    log::info!("PIC interrupts initialization and enabling");
+    log::info!("APIC interrupts initialization and enabling");
     interrupts::init();
 
     // MUST PRINT 32
