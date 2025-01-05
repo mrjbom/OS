@@ -1,3 +1,4 @@
+use crate::acpi::PLATFORM_INFO;
 use crate::interrupts::idt::IO_APIC_ISA_IRQ_VECTORS_RANGE;
 use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
 use acpi_lib::madt::{Madt, MadtEntry};
@@ -21,14 +22,7 @@ pub fn init() {
         .expect("Failed to find MADT");
     madt.validate().expect("Failed to validate MADT");
 
-    // Check platform info
-    let platform_info = acpi_tables_mutex_guard
-        .platform_info_in(GeneralPurposeAllocator)
-        .expect("Failed to get platform info using ACPI tables");
-    assert!(
-        platform_info.processor_info.is_some(),
-        "Processor info in platform info not found!"
-    );
+    let platform_info = PLATFORM_INFO.get().unwrap();
 
     // Check platform info and get IO APIC address
     let apic_info = match platform_info.interrupt_model {

@@ -1,12 +1,18 @@
+use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
 use crate::memory_management::virtual_memory_manager;
 use crate::memory_management::PAGE_SIZE;
-use acpi_lib::{AcpiTables, PhysicalMapping};
+use acpi_lib::{
+    AcpiTables, InterruptModel, ManagedSlice, PhysicalMapping, PlatformInfo, PowerProfile,
+};
 use bootloader_api::BootInfo;
+use core::alloc::Allocator;
 use core::ptr::NonNull;
 use spin::{Mutex, Once};
 use x86_64::{PhysAddr, VirtAddr};
 
 pub static ACPI_TABLES: Once<Mutex<AcpiTables<BaseAcpiHandler>>> = Once::new();
+
+pub static PLATFORM_INFO: Once<PlatformInfo<'static, GeneralPurposeAllocator>> = Once::new();
 
 /// Gets ACPI tables
 pub fn init(boot_info: &BootInfo) {
@@ -25,13 +31,27 @@ pub fn init(boot_info: &BootInfo) {
         (*rsdp).validate().expect("Invalid RSDP!");
     }
 
-    // Create ACPI tables
+    // Collect ACPI tables
     let acpi_tables = unsafe {
         AcpiTables::from_rsdp(BaseAcpiHandler, rsdp_phys_addr.as_u64() as usize)
             .expect("Failed to get ACPI tables")
     };
 
     ACPI_TABLES.call_once(|| Mutex::new(acpi_tables));
+
+    // Collect PlatformInfo
+    let acpi_tables_mutex_guard = ACPI_TABLES.get().unwrap().lock();
+    let platform_info = acpi_tables_mutex_guard
+        .platform_info_in(GeneralPurposeAllocator)
+        .expect("Failed to collect PlatformInfo from ACPI tables");
+    let static_platform_info: PlatformInfo<'static, _> = unsafe {
+        // SAFETY: ACPI_TABLES are static
+        // transmute forgets about the taked platform_info, so it won't be dropped and ManagedSlices will be alive
+        // The rest of the stack allocated variables will be copied when moved to a static variable
+        core::mem::transmute(platform_info)
+    };
+
+    PLATFORM_INFO.call_once(|| static_platform_info);
 }
 
 #[derive(Debug, Clone)]

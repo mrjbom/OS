@@ -1,6 +1,6 @@
 mod ioapic;
 
-use crate::acpi::ACPI_TABLES;
+use crate::acpi::{ACPI_TABLES, PLATFORM_INFO};
 use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
 use crate::memory_management::virtual_memory_manager;
 use crate::memory_management::PAGE_SIZE;
@@ -116,11 +116,8 @@ pub fn init() {
 
     // APIC enabled by default, but interrupts masked, need set vectors and unmask
     // Fill LVT registers (set and unmask vectors)
-    let bsp_uid = ACPI_TABLES
+    let bsp_uid = PLATFORM_INFO
         .get()
-        .unwrap()
-        .lock()
-        .platform_info_in(GeneralPurposeAllocator)
         .expect("Failed to get PlatformInfo")
         .processor_info
         .as_ref()
@@ -205,12 +202,9 @@ fn set_nmi_if_needed(
     local_interrupt_line: LocalInterruptLine,
     processor_uid: u32,
 ) {
-    let acpi_tables_lock = ACPI_TABLES.get().expect("ACPI TABLES not set").lock();
-    let platform_info = acpi_tables_lock
-        .platform_info_in(GeneralPurposeAllocator)
-        .expect("Failed to get platform info");
+    let platform_info = PLATFORM_INFO.get().unwrap();
 
-    if let InterruptModel::Apic(apic_info) = platform_info.interrupt_model {
+    if let InterruptModel::Apic(ref apic_info) = platform_info.interrupt_model {
         for nmi_line in apic_info.local_apic_nmi_lines.iter() {
             if nmi_line.line == local_interrupt_line {
                 let mut need_set_nmi = false;
