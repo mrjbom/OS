@@ -1,23 +1,25 @@
-use crate::memory_management::virtual_memory_manager::PHYSICAL_MEMORY_MAPPING_OFFSET;
+use crate::memory_management::virtual_memory_manager;
 use crate::memory_management::PAGE_SIZE;
 use acpi_lib::{AcpiTables, PhysicalMapping};
 use bootloader_api::BootInfo;
 use core::ptr::NonNull;
 use spin::{Mutex, Once};
-use x86_64::VirtAddr;
+use x86_64::{PhysAddr, VirtAddr};
 
 pub static ACPI_TABLES: Once<Mutex<AcpiTables<BaseAcpiHandler>>> = Once::new();
 
 /// Gets ACPI tables
 pub fn init(boot_info: &BootInfo) {
-    // Check RSDP address
-    let rsdp_phys_addr = boot_info
-        .rsdp_addr
-        .into_option()
-        .expect("Bootloader could not find RSDP");
+    // Get RSDP address
+    let rsdp_phys_addr = PhysAddr::new(
+        boot_info
+            .rsdp_addr
+            .into_option()
+            .expect("Bootloader could not find RSDP"),
+    );
 
     // Validate RSDP
-    let rsdp = VirtAddr::new(rsdp_phys_addr + PHYSICAL_MEMORY_MAPPING_OFFSET)
+    let rsdp = virtual_memory_manager::phys_addr_to_cpmm_virt_addr(rsdp_phys_addr)
         .as_ptr::<acpi_lib::rsdp::Rsdp>();
     unsafe {
         (*rsdp).validate().expect("Invalid RSDP!");
@@ -25,7 +27,7 @@ pub fn init(boot_info: &BootInfo) {
 
     // Create ACPI tables
     let acpi_tables = unsafe {
-        AcpiTables::from_rsdp(BaseAcpiHandler, rsdp_phys_addr as usize)
+        AcpiTables::from_rsdp(BaseAcpiHandler, rsdp_phys_addr.as_u64() as usize)
             .expect("Failed to get ACPI tables")
     };
 
@@ -55,8 +57,9 @@ impl acpi_lib::AcpiHandler for BaseAcpiHandler {
         debug_assert_eq!(physical_region_start as usize % PAGE_SIZE, 0);
         debug_assert!(physical_region_size >= PAGE_SIZE);
 
-        let virtual_address =
-            VirtAddr::new(physical_address as u64 + PHYSICAL_MEMORY_MAPPING_OFFSET);
+        let virtual_address = virtual_memory_manager::phys_addr_to_cpmm_virt_addr(PhysAddr::new(
+            physical_address as u64,
+        ));
 
         PhysicalMapping::new(
             physical_address,

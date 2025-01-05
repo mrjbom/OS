@@ -116,7 +116,17 @@ pub fn init() {
 
     // APIC enabled by default, but interrupts masked, need set vectors and unmask
     // Fill LVT registers (set and unmask vectors)
-    let bsp_uid = ACPI_TABLES.get().unwrap().lock().platform_info_in(GeneralPurposeAllocator).expect("Failed to get PlatformInfo").processor_info.as_ref().unwrap().boot_processor.processor_uid;
+    let bsp_uid = ACPI_TABLES
+        .get()
+        .unwrap()
+        .lock()
+        .platform_info_in(GeneralPurposeAllocator)
+        .expect("Failed to get PlatformInfo")
+        .processor_info
+        .as_ref()
+        .unwrap()
+        .boot_processor
+        .processor_uid;
     fill_spurious_interrupt_vector_register();
     fill_lvt_lint0_register(bsp_uid);
     fill_lvt_lint1_register(bsp_uid);
@@ -155,7 +165,11 @@ fn fill_lvt_lint0_register(processor_uid: u32) {
     let mut register_value = LvtRegister(0);
     register_value.set_vector(super::idt::LOCAL_APIC_LINT0_IDT_VECTOR as u32);
 
-    set_nmi_if_needed(&mut register_value, LocalInterruptLine::Lint0, processor_uid);
+    set_nmi_if_needed(
+        &mut register_value,
+        LocalInterruptLine::Lint0,
+        processor_uid,
+    );
 
     unsafe {
         LVT_LINT0_REGISTER.write_volatile(register_value.0);
@@ -174,7 +188,11 @@ fn fill_lvt_lint1_register(processor_uid: u32) {
     let mut register_value = LvtRegister(0);
     register_value.set_vector(super::idt::LOCAL_APIC_LINT1_IDT_VECTOR as u32);
 
-    set_nmi_if_needed(&mut register_value, LocalInterruptLine::Lint1, processor_uid);
+    set_nmi_if_needed(
+        &mut register_value,
+        LocalInterruptLine::Lint1,
+        processor_uid,
+    );
 
     unsafe {
         LVT_LINT1_REGISTER.write_volatile(register_value.0);
@@ -182,7 +200,11 @@ fn fill_lvt_lint1_register(processor_uid: u32) {
 }
 
 /// Sets NMI delivery mode for LINT# if it's required by ACPI table
-fn set_nmi_if_needed(lvt_register: &mut LvtRegister, local_interrupt_line: LocalInterruptLine, processor_uid: u32) {
+fn set_nmi_if_needed(
+    lvt_register: &mut LvtRegister,
+    local_interrupt_line: LocalInterruptLine,
+    processor_uid: u32,
+) {
     let acpi_tables_lock = ACPI_TABLES.get().expect("ACPI TABLES not set").lock();
     let platform_info = acpi_tables_lock
         .platform_info_in(GeneralPurposeAllocator)
