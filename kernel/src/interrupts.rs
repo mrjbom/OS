@@ -1,6 +1,3 @@
-use core::ops::RangeInclusive;
-use x86_64::structures::idt::{ExceptionVector, InterruptStackFrame};
-
 pub mod apic;
 pub mod idt;
 pub mod pic;

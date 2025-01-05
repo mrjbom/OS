@@ -1,13 +1,12 @@
 use crate::acpi::PLATFORM_INFO;
 use crate::interrupts::idt::IO_APIC_ISA_IRQ_VECTORS_RANGE;
 use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
-use acpi_lib::madt::{Madt, MadtEntry};
+use acpi_lib::madt::Madt;
 use acpi_lib::platform::interrupt::{Polarity, TriggerMode};
 use acpi_lib::{AcpiTable, InterruptModel, ManagedSlice};
 use bitfield::bitfield;
 use core::ops::Add;
 use spin::Once;
-use tinyvec::ArrayVec;
 use x86_64::{PhysAddr, VirtAddr};
 
 static IO_APIC_PHYS_ADDR: Once<PhysAddr> = Once::new();
@@ -197,17 +196,12 @@ fn write_ioapic_redirection_table_entry(
     index: u8,
     redirection_table_entry: &RedirectionTableEntry,
 ) {
-    let io_apic_virt_addr = IO_APIC_VIRT_ADDR
-        .get()
-        .expect("IO APIC VIRT ADDR is not set, bug");
     let offset_low = 0x10 + 2 * index;
     let offset_high = offset_low + 1;
     let low = redirection_table_entry.0 as u32;
     let high = (redirection_table_entry.0 >> 32) as u32;
-    unsafe {
-        write_ioapic_register(offset_low, low);
-        write_ioapic_register(offset_high, high);
-    }
+    write_ioapic_register(offset_low, low);
+    write_ioapic_register(offset_high, high);
 }
 
 bitfield! {

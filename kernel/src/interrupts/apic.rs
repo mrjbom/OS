@@ -1,7 +1,6 @@
 mod ioapic;
 
-use crate::acpi::{ACPI_TABLES, PLATFORM_INFO};
-use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
+use crate::acpi::PLATFORM_INFO;
 use crate::memory_management::virtual_memory_manager;
 use crate::memory_management::PAGE_SIZE;
 use acpi_lib::platform::interrupt::{LocalInterruptLine, NmiProcessor};

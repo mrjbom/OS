@@ -1,4 +1,4 @@
-use super::{apic, pic, pit};
+use super::{apic, pit};
 use core::ops::RangeInclusive;
 use x86_64::structures::idt::{ExceptionVector, InterruptDescriptorTable, InterruptStackFrame};
 

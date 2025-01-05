@@ -1,14 +1,11 @@
 use crate::memory_management::general_purpose_allocator::GeneralPurposeAllocator;
 use crate::memory_management::virtual_memory_manager;
 use crate::memory_management::PAGE_SIZE;
-use acpi_lib::{
-    AcpiTables, InterruptModel, ManagedSlice, PhysicalMapping, PlatformInfo, PowerProfile,
-};
+use acpi_lib::{AcpiTables, PhysicalMapping, PlatformInfo};
 use bootloader_api::BootInfo;
-use core::alloc::Allocator;
 use core::ptr::NonNull;
 use spin::{Mutex, Once};
-use x86_64::{PhysAddr, VirtAddr};
+use x86_64::PhysAddr;
 
 pub static ACPI_TABLES: Once<Mutex<AcpiTables<BaseAcpiHandler>>> = Once::new();
 
