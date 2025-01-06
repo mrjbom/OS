@@ -130,9 +130,6 @@ pub fn init() {
 
     // Configure IO APIC for Legacy ISA IRQ's
     ioapic::init();
-
-    // Enable interrupts
-    x86_64::instructions::interrupts::enable();
 }
 
 /// Set and unmasks APIC Timer interrupt vector <br>

@@ -12,6 +12,7 @@ mod gdt;
 mod interrupts;
 mod memory_management;
 mod serial_debug;
+mod timers;
 
 static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
     let mut config = bootloader_api::BootloaderConfig::new_default();
@@ -56,9 +57,14 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("Getting ACPI tables");
     acpi::init(boot_info);
 
-    // Init and enable interrupts (IO APIC, Bootstrap Processor Local APIC)
+    // Init IO APIC, Bootstrap Processor Local APIC
+    // But it doesn't enable interrupts
     log::info!("APIC interrupts initialization and enabling");
     interrupts::init();
+
+    // Init timers
+    log::info!("Timers initialization");
+    timers::init();
 
     // MUST PRINT 32
     x86_64::instructions::interrupts::enable();

@@ -1,6 +1,7 @@
-use super::{apic, pit};
+use super::apic;
 use core::ops::RangeInclusive;
 use x86_64::structures::idt::{ExceptionVector, InterruptDescriptorTable, InterruptStackFrame};
+use crate::timers;
 
 static mut IDT: InterruptDescriptorTable = InterruptDescriptorTable::new();
 
@@ -66,7 +67,7 @@ pub fn general_interrupt_handler(
             crate::serial_println_lock_free!("IO APIC ISA IRQ interrupt {index}");
             // PIT interrupt
             if index == 32 {
-                pit::handler();
+                timers::pit::tick_interrupt_handler();
             }
             apic::send_eoi();
         }
