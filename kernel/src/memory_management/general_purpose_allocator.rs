@@ -42,7 +42,7 @@ unsafe impl dlmalloc::Allocator for DlmallocSystemAllocator {
         if phys_addr.is_null() {
             return (null_mut(), 0, 0);
         }
-        let virt_addr = super::virtual_memory_manager::phys_addr_to_cpmm_virt_addr(phys_addr);
+        let virt_addr = super::virtual_memory_manager::virt_addr_in_cpmm_from_phys_addr(phys_addr);
         (virt_addr.as_mut_ptr(), size, 0)
     }
 
@@ -58,7 +58,7 @@ unsafe impl dlmalloc::Allocator for DlmallocSystemAllocator {
         if can_move {
             let virt_addr = VirtAddr::from_ptr(ptr);
             let phys_addr =
-                super::virtual_memory_manager::virt_addr_from_cpmm_to_phys_addr(virt_addr);
+                super::virtual_memory_manager::phys_addr_from_virt_addr_from_cpmm(virt_addr);
             unsafe {
                 let new_phys_addr =
                     super::physical_memory_manager::realloc(phys_addr, newsize, true);
@@ -67,7 +67,7 @@ unsafe impl dlmalloc::Allocator for DlmallocSystemAllocator {
                 }
                 let new_phys_addr = PhysAddr::new(new_phys_addr as u64);
                 let new_virt_addr =
-                    super::virtual_memory_manager::phys_addr_to_cpmm_virt_addr(new_phys_addr);
+                    super::virtual_memory_manager::virt_addr_in_cpmm_from_phys_addr(new_phys_addr);
                 new_virt_addr.as_mut_ptr()
             }
         } else {
@@ -86,7 +86,8 @@ unsafe impl dlmalloc::Allocator for DlmallocSystemAllocator {
         }
 
         let virt_addr = VirtAddr::from_ptr(ptr);
-        let phys_addr = super::virtual_memory_manager::virt_addr_from_cpmm_to_phys_addr(virt_addr);
+        let phys_addr =
+            super::virtual_memory_manager::phys_addr_from_virt_addr_from_cpmm(virt_addr);
         unsafe {
             super::physical_memory_manager::free(phys_addr);
         }

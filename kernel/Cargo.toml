@@ -16,6 +16,7 @@ raw-cpuid = "11.2.0"
 acpi_lib = { package = "acpi", version = "5.1.0", default-features = false, features = ["allocator_api"] }
 dlmalloc = "0.2.7"
 bitfield = "0.17.0"
+fixed = "1.28.0"
 
 # My
 buddy_alloc = { git = "https://github.com/mrjbom/buddy_alloc_rs.git" }

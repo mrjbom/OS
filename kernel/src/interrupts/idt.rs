@@ -1,7 +1,7 @@
 use super::apic;
+use crate::timers;
 use core::ops::RangeInclusive;
 use x86_64::structures::idt::{ExceptionVector, InterruptDescriptorTable, InterruptStackFrame};
-use crate::timers;
 
 static mut IDT: InterruptDescriptorTable = InterruptDescriptorTable::new();
 
@@ -16,7 +16,7 @@ pub fn init() {
 }
 
 pub const CPU_EXCEPTIONS_IDT_VECTORS_RANGE: RangeInclusive<u8> = 0..=31;
-pub const IO_APIC_ISA_IRQ_VECTORS_RANGE: RangeInclusive<u8> = 32..=57;
+pub const IO_APIC_ISA_IRQ_VECTORS_RANGE: RangeInclusive<u8> = 32..=47;
 pub const LOCAL_APIC_TIMER_IDT_VECTOR: u8 = 48;
 pub const LOCAL_APIC_LINT0_IDT_VECTOR: u8 = 49;
 pub const LOCAL_APIC_LINT1_IDT_VECTOR: u8 = 50;
@@ -64,10 +64,11 @@ pub fn general_interrupt_handler(
             }
         }
         index if IO_APIC_ISA_IRQ_VECTORS_RANGE.contains(&index) => {
-            crate::serial_println_lock_free!("IO APIC ISA IRQ interrupt {index}");
             // PIT interrupt
             if index == 32 {
                 timers::pit::tick_interrupt_handler();
+            } else {
+                crate::serial_println_lock_free!("IO APIC ISA IRQ interrupt {index}");
             }
             apic::send_eoi();
         }

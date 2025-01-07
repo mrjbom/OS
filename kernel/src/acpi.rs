@@ -22,7 +22,7 @@ pub fn init(boot_info: &BootInfo) {
     );
 
     // Validate RSDP
-    let rsdp = virtual_memory_manager::phys_addr_to_cpmm_virt_addr(rsdp_phys_addr)
+    let rsdp = virtual_memory_manager::virt_addr_in_cpmm_from_phys_addr(rsdp_phys_addr)
         .as_ptr::<acpi_lib::rsdp::Rsdp>();
     unsafe {
         (*rsdp).validate().expect("Invalid RSDP!");
@@ -74,9 +74,9 @@ impl acpi_lib::AcpiHandler for BaseAcpiHandler {
         debug_assert_eq!(physical_region_start as usize % PAGE_SIZE, 0);
         debug_assert!(physical_region_size >= PAGE_SIZE);
 
-        let virtual_address = virtual_memory_manager::phys_addr_to_cpmm_virt_addr(PhysAddr::new(
-            physical_address as u64,
-        ));
+        let virtual_address = virtual_memory_manager::virt_addr_in_cpmm_from_phys_addr(
+            PhysAddr::new(physical_address as u64),
+        );
 
         PhysicalMapping::new(
             physical_address,

@@ -268,21 +268,21 @@ pub fn init(boot_info: &bootloader_api::BootInfo) {
 
     // Check free memory in allocator and regions
     if let Some(zone) = ISA_DMA_ZONE.get() {
-        let free_memory_size = ISA_DMA_USABLE_REGIONS.lock().iter().map(|v| v.size()).sum();
+        let free_memory_size: usize = ISA_DMA_USABLE_REGIONS.lock().iter().map(|v| v.size()).sum();
         unsafe {
             assert_eq!(zone.lock().allocator.arena_free_size(), free_memory_size);
         }
     }
 
     if let Some(zone) = DMA32_ZONE.get() {
-        let free_memory_size = DMA32_USABLE_REGIONS.lock().iter().map(|v| v.size()).sum();
+        let free_memory_size: usize = DMA32_USABLE_REGIONS.lock().iter().map(|v| v.size()).sum();
         unsafe {
             assert_eq!(zone.lock().allocator.arena_free_size(), free_memory_size);
         }
     }
 
     if let Some(zone) = HIGH_ZONE.get() {
-        let free_memory_size = HIGH_USABLE_REGIONS.lock().iter().map(|v| v.size()).sum();
+        let free_memory_size: usize = HIGH_USABLE_REGIONS.lock().iter().map(|v| v.size()).sum();
         unsafe {
             assert_eq!(zone.lock().allocator.arena_free_size(), free_memory_size);
         }
@@ -495,7 +495,7 @@ fn init_slab_info_ptrs_array() {
     // Memory reserved, make slice
     // Convert to virtual address
     let required_memory_virt_addr =
-        virtual_memory_manager::phys_addr_to_cpmm_virt_addr(required_memory_phys_addr);
+        virtual_memory_manager::virt_addr_in_cpmm_from_phys_addr(required_memory_phys_addr);
     // We don't init memory, because it's may be slow operation, there is no UB, because MaybeUninit used.
     // For example, a machine with 32 gigabytes of memory will need to initialize 64 megabytes.
     let slice: &'static mut [MaybeUninit<*mut SlabInfo>] = unsafe {

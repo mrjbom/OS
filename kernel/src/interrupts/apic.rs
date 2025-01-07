@@ -30,7 +30,7 @@ const BASE_PHYS_ADDR: PhysAddr = PhysAddr::new(0xFEE00000);
 ///
 /// ## Must be mapped without caching
 const BASE_VIRT_ADDR: VirtAddr =
-    virtual_memory_manager::phys_addr_to_cpmm_virt_addr(BASE_PHYS_ADDR);
+    virtual_memory_manager::virt_addr_in_cpmm_from_phys_addr(BASE_PHYS_ADDR);
 
 // Registers
 /// 0x30    Local APIC Version Register

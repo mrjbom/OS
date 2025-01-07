@@ -22,7 +22,7 @@ pub fn init() {
     // First 128 TB represended by first 256 entries of PML4
     let (pml4, _) = x86_64::registers::control::Cr3::read();
     assert!(!pml4.start_address().is_null());
-    let pml4 = phys_addr_to_cpmm_virt_addr(pml4.start_address());
+    let pml4 = virt_addr_in_cpmm_from_phys_addr(pml4.start_address());
     let pml4 = pml4.as_mut_ptr::<PageTable>();
     // Unmap first 128 TB
     for i in 0..256 {
@@ -37,7 +37,7 @@ pub fn init() {
 ///
 /// Adds PHYSICAL_MEMORY_MAPPING_OFFSET to physical address
 #[inline]
-pub const fn phys_addr_to_cpmm_virt_addr(phys_addr: PhysAddr) -> VirtAddr {
+pub const fn virt_addr_in_cpmm_from_phys_addr(phys_addr: PhysAddr) -> VirtAddr {
     VirtAddr::new(phys_addr.as_u64() + PHYSICAL_MEMORY_MAPPING_OFFSET)
 }
 
@@ -45,7 +45,7 @@ pub const fn phys_addr_to_cpmm_virt_addr(phys_addr: PhysAddr) -> VirtAddr {
 ///
 /// Subs PHYSICAL_MEMORY_MAPPING_OFFSET from virtual address
 #[inline]
-pub const fn virt_addr_from_cpmm_to_phys_addr(virt_addr: VirtAddr) -> PhysAddr {
+pub const fn phys_addr_from_virt_addr_from_cpmm(virt_addr: VirtAddr) -> PhysAddr {
     PhysAddr::new(virt_addr.as_u64() - PHYSICAL_MEMORY_MAPPING_OFFSET)
 }
 
@@ -63,7 +63,7 @@ pub fn set_flags_in_page_table(
     let mut current_level = PageTableLevel::Four;
     let mut page_table_phys_addr = x86_64::registers::control::Cr3::read().0.start_address();
     loop {
-        let page_table_virt_addr = phys_addr_to_cpmm_virt_addr(page_table_phys_addr);
+        let page_table_virt_addr = virt_addr_in_cpmm_from_phys_addr(page_table_phys_addr);
         let page_table = page_table_virt_addr.as_mut_ptr::<PageTable>();
         debug_assert!(!page_table.is_null(), "Page table null ptr");
         debug_assert!(page_table.is_aligned(), "Not aligned page table address");

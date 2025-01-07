@@ -1,9 +1,7 @@
 /// Programmable Interval Timer
 ///
 /// Only used to calibrate other timers if HPET is not available, since I'm too lazy to deal with this ancient shit.
-
 // http://www.brokenthorn.com/Resources/OSDev16.html
-
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 const BASE_FREQ: u32 = 1193182;

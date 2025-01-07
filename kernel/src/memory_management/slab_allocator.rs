@@ -56,7 +56,7 @@ impl MemoryBackend for DefaultMemoryBackend {
         if phys_addr.is_null() {
             return null_mut();
         }
-        super::virtual_memory_manager::phys_addr_to_cpmm_virt_addr(phys_addr).as_mut_ptr()
+        super::virtual_memory_manager::virt_addr_in_cpmm_from_phys_addr(phys_addr).as_mut_ptr()
     }
 
     unsafe fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
@@ -66,7 +66,8 @@ impl MemoryBackend for DefaultMemoryBackend {
             "Slab allocator tries to free invalid slab size"
         );
         let virt_addr = VirtAddr::from_ptr(slab_ptr);
-        let phys_addr = super::virtual_memory_manager::virt_addr_from_cpmm_to_phys_addr(virt_addr);
+        let phys_addr =
+            super::virtual_memory_manager::phys_addr_from_virt_addr_from_cpmm(virt_addr);
         super::physical_memory_manager::free(phys_addr);
     }
 
@@ -101,7 +102,8 @@ impl MemoryBackend for DefaultMemoryBackend {
             "Slab allocator tries to save SlabInfo with null ptr"
         );
         let virt_addr = VirtAddr::new(object_page_addr as u64);
-        let phys_addr = super::virtual_memory_manager::virt_addr_from_cpmm_to_phys_addr(virt_addr);
+        let phys_addr =
+            super::virtual_memory_manager::phys_addr_from_virt_addr_from_cpmm(virt_addr);
 
         // OMG
         #[allow(static_mut_refs)]
@@ -118,7 +120,8 @@ impl MemoryBackend for DefaultMemoryBackend {
         );
 
         let virt_addr = VirtAddr::new(object_page_addr as u64);
-        let phys_addr = super::virtual_memory_manager::virt_addr_from_cpmm_to_phys_addr(virt_addr);
+        let phys_addr =
+            super::virtual_memory_manager::phys_addr_from_virt_addr_from_cpmm(virt_addr);
 
         #[allow(static_mut_refs)]
         let slab_info_ptr_array_ref: &&mut [MaybeUninit<*mut SlabInfo>] =
@@ -155,7 +158,7 @@ impl MemoryBackend for SlabInfoCacheMemoryBackend {
         if phys_addr.is_null() {
             return null_mut();
         }
-        super::virtual_memory_manager::phys_addr_to_cpmm_virt_addr(phys_addr).as_mut_ptr()
+        super::virtual_memory_manager::virt_addr_in_cpmm_from_phys_addr(phys_addr).as_mut_ptr()
     }
 
     unsafe fn free_slab(&mut self, slab_ptr: *mut u8, slab_size: usize, page_size: usize) {
@@ -165,7 +168,8 @@ impl MemoryBackend for SlabInfoCacheMemoryBackend {
             "SlabInfo allocator tries to free invalid slab size"
         );
         let virt_addr = VirtAddr::from_ptr(slab_ptr);
-        let phys_addr = super::virtual_memory_manager::virt_addr_from_cpmm_to_phys_addr(virt_addr);
+        let phys_addr =
+            super::virtual_memory_manager::phys_addr_from_virt_addr_from_cpmm(virt_addr);
         super::physical_memory_manager::free(phys_addr);
     }
 

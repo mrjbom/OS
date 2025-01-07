@@ -44,7 +44,7 @@ pub fn init() {
             // Get IO APIC address
             IO_APIC_PHYS_ADDR.call_once(|| PhysAddr::new(apic_info.io_apics[0].address as u64));
             IO_APIC_VIRT_ADDR.call_once(|| {
-                crate::memory_management::virtual_memory_manager::phys_addr_to_cpmm_virt_addr(
+                crate::memory_management::virtual_memory_manager::virt_addr_in_cpmm_from_phys_addr(
                     *IO_APIC_PHYS_ADDR.get().unwrap(),
                 )
             });
