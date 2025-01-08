@@ -66,21 +66,6 @@ fn kmain(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     log::info!("Timers initialization");
     timers::init();
 
-    log::debug!("Sleep 3 seconds");
-    timers::hpet::sleep(core::time::Duration::from_secs(3));
-
-    for _ in 0..30 {
-        let current_duration = timers::hpet::get_current_ticks_as_duration();
-        log::debug!("{:?}", current_duration);
-        timers::hpet::sleep(core::time::Duration::from_secs(1));
-    }
-    log::debug!("End {:?}", timers::hpet::get_current_ticks_as_duration());
-
-    // MUST PRINT 32
-    x86_64::instructions::interrupts::enable();
-    log::debug!("Prints 32?");
-    loop {}
-
     x86_64::instructions::interrupts::disable();
     // Kernel finish
     log::info!("--- KERNEL FINISH ---");

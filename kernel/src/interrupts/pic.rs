@@ -8,9 +8,9 @@ pub fn init_and_disable() {
     x86_64::instructions::interrupts::disable();
     #[allow(static_mut_refs)]
     unsafe {
-        // Init
-        PICS.initialize();
         // Mask all interrupts
         PICS.disable();
+        // Init (all lines masked)
+        //PICS.initialize();
     };
 }
