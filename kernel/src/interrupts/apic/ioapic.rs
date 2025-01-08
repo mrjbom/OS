@@ -62,7 +62,7 @@ pub fn init() {
     let number_of_redirection_table_entries = ((read_ioapic_register(0x01) & 0xFF0000) >> 16) + 1;
     assert!(
         number_of_redirection_table_entries >= 24,
-        "Number of redirection table entries in is less than 24, bug"
+        "Number of redirection table entries is less than 24, bug"
     );
 
     // Fill redirection table
