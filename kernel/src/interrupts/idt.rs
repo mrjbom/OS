@@ -17,20 +17,22 @@ pub fn init() {
 
 pub const CPU_EXCEPTIONS_IDT_VECTORS_RANGE: RangeInclusive<u8> = 0..=31;
 pub const IO_APIC_ISA_IRQ_VECTORS_RANGE: RangeInclusive<u8> = 32..=47;
-pub const LOCAL_APIC_TIMER_IDT_VECTOR: u8 = 48;
-pub const LOCAL_APIC_LINT0_IDT_VECTOR: u8 = 49;
-pub const LOCAL_APIC_LINT1_IDT_VECTOR: u8 = 50;
-pub const LOCAL_APIC_ERROR_IDT_VECTOR: u8 = 51;
+pub const IO_APIC_24_VECTORS_RANGE: RangeInclusive<u8> = 32..=55;
+pub const LOCAL_APIC_TIMER_IDT_VECTOR: u8 = 56;
+pub const LOCAL_APIC_LINT0_IDT_VECTOR: u8 = 57;
+pub const LOCAL_APIC_LINT1_IDT_VECTOR: u8 = 58;
+pub const LOCAL_APIC_ERROR_IDT_VECTOR: u8 = 59;
 pub const LOCAL_APIC_SPURIOUS_IDT_VECTOR: u8 = 255;
 
 /// A general handler function for an interrupt or an exception with the interrupt/exception index and an optional error code
 ///
 /// 0-31    CPU exceptions<br>
 /// 32-47   IO APIC Legacy ISA IRQ's
-/// 48      Local APIC Timer<br>
-/// 49      Local APIC LINT0<br>
-/// 50      Local APIC LINT1<br>
-/// 51      Local APIC Error<br>
+/// 32-55   IO APIC 24 pins
+/// 56      Local APIC Timer<br>
+/// 57      Local APIC LINT0<br>
+/// 58      Local APIC LINT1<br>
+/// 59      Local APIC Error<br>
 /// 255     Local APIC Spurious-Interrupt (handler must do nothing (and even don't send an EOI))
 pub fn general_interrupt_handler(
     interrupt_stack_frame: InterruptStackFrame,
@@ -63,12 +65,16 @@ pub fn general_interrupt_handler(
                 }
             }
         }
-        index if IO_APIC_ISA_IRQ_VECTORS_RANGE.contains(&index) => {
-            // PIT interrupt
-            if index == 32 {
-                timers::pit::tick_interrupt_handler();
+        index if IO_APIC_24_VECTORS_RANGE.contains(&index) => {
+            if IO_APIC_ISA_IRQ_VECTORS_RANGE.contains(&index) {
+                // PIT interrupt
+                if index == 32 {
+                    timers::pit::tick_interrupt_handler();
+                } else {
+                    crate::serial_println_lock_free!("IO APIC ISA IRQ interrupt: {index}");
+                }
             } else {
-                crate::serial_println_lock_free!("IO APIC ISA IRQ interrupt {index}");
+                crate::serial_println_lock_free!("IO APIC *NOT* ISA IRQ interrupt: {index}");
             }
             apic::send_eoi();
         }
