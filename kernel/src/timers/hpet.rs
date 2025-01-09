@@ -8,7 +8,7 @@ use fixed::FixedU64;
 use spin::Once;
 use x86_64::{PhysAddr, VirtAddr};
 
-static HPET_TIMER: Once<Option<HPETTimer>> = Once::new();
+static HPET_TIMER: Once<Result<HPETTimer, &'static str>> = Once::new();
 
 /// Detects and creates HPET (but not starts, only detects)
 pub fn init() {
@@ -18,7 +18,7 @@ pub fn init() {
         // If table not found - HPET not supported
         if matches!(hpet_info, Err(AcpiError::TableMissing(_))) {
             log::info!("HPET not supported");
-            HPET_TIMER.call_once(|| None);
+            HPET_TIMER.call_once(|| Err("Not supported, ACPI table missing"));
             return;
         } else {
             // Some ACPI error occurs
@@ -55,15 +55,19 @@ pub fn init() {
     let hpet_info = hpet_info.unwrap();
 
     // Create HPET control object
-    HPET_TIMER.call_once(|| Some(HPETTimer::new(hpet_info)));
+    HPET_TIMER.call_once(|| HPETTimer::new(hpet_info));
+    if let Err(err) = HPET_TIMER.get().unwrap() {
+        log::info!("HPET cannot be used: {err}");
+    }
 
     // Run main counter and interrupts (if comparators has enabled interrupts)
+    log::info!("Run HPET");
     run();
 }
 
 #[inline]
 pub fn is_supported() -> bool {
-    HPET_TIMER.get().unwrap().is_some()
+    HPET_TIMER.get().unwrap().is_ok()
 }
 
 // HPET control structure
@@ -79,7 +83,7 @@ struct HPETTimer {
 
 impl HPETTimer {
     /// Creates HPET timer, checks cap's
-    fn new(hpet_acpi_info: HpetInfo) -> Self {
+    fn new(hpet_acpi_info: HpetInfo) -> Result<Self, &'static str> {
         // Get base address
         let base_address = virtual_memory_manager::virt_addr_in_cpmm_from_phys_addr(PhysAddr::new(
             hpet_acpi_info.base_address as u64,
@@ -98,11 +102,9 @@ impl HPETTimer {
 
         // The 32-bit counter will overflow after about 7 minutes (for 10 MHz)
         // A 32-bit counter is unlikely to be encountered because the specification recommends having a 64-bit
-        assert_eq!(
-            general_capabilities_and_id_register_value.count_size_cap(),
-            true,
-            "HPET don't have 64-bit main counter"
-        );
+        if general_capabilities_and_id_register_value.count_size_cap() == false {
+            return Err("HPET don't have 64-bit main counter");
+        }
 
         // Must have minimum 3 comparators
         assert!(
@@ -125,13 +127,13 @@ impl HPETTimer {
             "Calculated period in nanoseconds small than delta"
         );
 
-        Self {
+        Ok(Self {
             hpet_acpi_info,
             base_address,
             period_in_femtoseconds,
             period_in_nanoseconds,
             frequency,
-        }
+        })
     }
     /// General Capabilities And ID Register
     #[inline]

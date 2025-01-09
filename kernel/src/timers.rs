@@ -22,7 +22,7 @@ enum TimerName {
 // 1. PIT - Only for calibrating other timers (ITSC and Local APIC Timer) if HPET is not available.
 // 2. HPET - To calibrate ITSC and Local APIC Timer, as a system-wide timer
 // (to time and measure time or generate interrupts in one-shot mode) if ITSC is not available.
-// 3. ITSC - As a system-wide timer to time and measure time.
+// 3. Invariant TSC - As a system-wide timer to time and measure time.
 // 4. Local APIC Timer - To generate scheduler interrupts for each core.
 
 /// Inits PIT, HPET, Invariant TSC and bootstrap processor's Local APIC Timer
@@ -36,6 +36,7 @@ pub fn init() {
     hpet::init();
 
     // Check Invariant TSC support using cpuid (works on Intel and AMD)
+    // TODO: add ITSC
     let cpuid = raw_cpuid::CpuId::new();
     let has_invariant_tsc = cpuid
         .get_advanced_power_mgmt_info()
